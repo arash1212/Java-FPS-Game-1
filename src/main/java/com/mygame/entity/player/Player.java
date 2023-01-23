@@ -37,6 +37,8 @@ public class Player extends Node implements Actor {
     private static final float GRAVITY_SPEED = 20;
     private static final float JUMP_SPEED = 10;
     private static final float HEIGHT = 1.8f;
+    private static final float MIN_CAMERA_X = -1.4F;
+    private static final float MAX_CAMERA_X = 1.4F;
 
     private float currentSpeed = 6;
     private float currentFov = 50f;
@@ -82,6 +84,7 @@ public class Player extends Node implements Actor {
     private final Quaternion tmpRot = new Quaternion();
     private final Node cameraBase = new Node();
     private float cameraBaseY = 0;
+    private float cameraBaseX = 0;
 
     //recoil 
     private Vector3f currentRotation = new Vector3f();
@@ -115,6 +118,7 @@ public class Player extends Node implements Actor {
 
         cameraBase.getLocalTransform().getTranslation().y += 2.0f;
         cameraBaseY = cameraBase.getLocalTransform().getTranslation().y;
+        cameraBaseX = cameraBase.getLocalTransform().getTranslation().x;
         cameraBase.attachChild(cameraNode);
         this.attachChild(cameraBase);
     }
@@ -152,32 +156,21 @@ public class Player extends Node implements Actor {
         this.recoil(tpf);
     }
 
-    private void setCurrentSpeed() {
-        if (this.state.equals(EnumActorState.WALKING) && currentSpeed < MOVEMENT_SPEED) {
-            currentSpeed += 0.05f;
-        } else if (this.state.equals(EnumActorState.RUNNING) && currentSpeed > RUN_SPEED) {
-            currentSpeed -= 0.3f;
-        } else if (this.state.equals(EnumActorState.STAND_STILL)) {
-            currentSpeed = MOVEMENT_SPEED;
-        }
-    }
-
-    private void updateCamera(float tpf) {
-        Managers.getInstance().getInputManager().setCursorVisible(false);
-        if (inputState.mouseDeltaXY == null) {
-            return;
-        }
-
-        float h = inputState.mouseXY.getX() / 1024;
+    /**
+     * ********************************Camera*****************************************
+     */
+    private void updateCameraRotation() {
         float v = inputState.mouseXY.getY() / 1024;
-        //camera rotation
-        // this.cameraNode.rotate(new Quaternion().fromAngles(-v, 0, 0));
-        this.cameraBase.rotate(new Quaternion().fromAngles(-v * mouseSensitivity, 0, 0));
+
+        cameraBaseX = FastMath.clamp(this.cameraBaseX + (-v), MIN_CAMERA_X, MAX_CAMERA_X);
+        this.cameraBase.setLocalRotation(new Quaternion().fromAngles(cameraBaseX, 0, 0));
         if (inputState.mouseXY.y != 0) {
             inputState.mouseXY.y = 0;
         }
+    }
 
-        //control rotations
+    private void updateRotation() {
+        float h = inputState.mouseXY.getX() / 1024;
         if (inputState.mouseXY.x != 0) {
             angles[1] += -h * mouseSensitivity;
             inputState.mouseXY.x = 0;
@@ -188,7 +181,29 @@ public class Player extends Node implements Actor {
         tmpRot.fromAngles(angles);
         tmpRot.multLocal(viewDirection);
         control.setViewDirection(viewDirection);
+    }
 
+    private void updateCamera(float tpf) {
+        Managers.getInstance().getInputManager().setCursorVisible(false);
+        if (inputState.mouseDeltaXY == null) {
+            return;
+        }
+
+        this.updateCameraRotation();
+        this.updateRotation();
+    }
+
+    /**
+     * ********************************Movement*****************************************
+     */
+    private void setCurrentSpeed() {
+        if (this.state.equals(EnumActorState.WALKING) && currentSpeed < MOVEMENT_SPEED) {
+            currentSpeed += 0.05f;
+        } else if (this.state.equals(EnumActorState.RUNNING) && currentSpeed > RUN_SPEED) {
+            currentSpeed -= 0.3f;
+        } else if (this.state.equals(EnumActorState.STAND_STILL)) {
+            currentSpeed = MOVEMENT_SPEED;
+        }
     }
 
     private void updateMovements(float tpf) {
@@ -221,28 +236,21 @@ public class Player extends Node implements Actor {
         // this.cameraNode.setLocalTranslation(this.camPosition);
     }
 
-    //weapons
-    private void initWeapons() {
-        this.weapons.add(new PistolMakarove());
-
-        this.selectedWeapon = this.weapons.get(0);
-        this.selectedWeapon.select();
-        this.selectedWeapon.setOwner(this);
-    }
-
-    @Override
-    public EnumActorState getState() {
-        return state;
-    }
-
-    @Override
-    public void setState(EnumActorState state) {
-        this.state = state;
-    }
-
-    @Override
-    public CharacterControl getControl() {
-        return control;
+    private void headBob(float tpf) {
+        if (this.state == EnumActorState.WALKING || this.state == EnumActorState.RUNNING) {
+            this.headBobTimer += tpf * (this.state == EnumActorState.WALKING ? this.headBobWalkSpeed : this.headBobRunSpeed);
+            this.cameraBase.setLocalTranslation(
+                    this.cameraNode.getLocalTranslation().x,
+                    cameraBaseY + FastMath.sin(headBobTimer) * this.headBobAmount,
+                    this.cameraNode.getLocalTranslation().z
+            );
+        } else {
+            this.cameraBase.setLocalTranslation(
+                    this.cameraNode.getLocalTranslation().x,
+                    cameraBaseY,
+                    this.cameraNode.getLocalTranslation().z
+            );
+        }
     }
 
     @Override
@@ -252,6 +260,17 @@ public class Player extends Node implements Actor {
                 && this.inputState.isPressedForward
                 && inputState.isPressedRun
                 && !inputState.isPressedAim;
+    }
+
+    /**
+     * ********************************Weapons*****************************************
+     */
+    private void initWeapons() {
+        this.weapons.add(new PistolMakarove());
+
+        this.selectedWeapon = this.weapons.get(0);
+        this.selectedWeapon.select();
+        this.selectedWeapon.setOwner(this);
     }
 
     private void fire() {
@@ -279,27 +298,25 @@ public class Player extends Node implements Actor {
         }
     }
 
-    private void headBob(float tpf) {
-        if (this.state == EnumActorState.WALKING || this.state == EnumActorState.RUNNING) {
-            this.headBobTimer += tpf * (this.state == EnumActorState.WALKING ? this.headBobWalkSpeed : this.headBobRunSpeed);
-            this.cameraBase.setLocalTranslation(
-                    this.cameraNode.getLocalTranslation().x,
-                    cameraBaseY + FastMath.sin(headBobTimer) * this.headBobAmount,
-                    this.cameraNode.getLocalTranslation().z
-            );
-        } else {
-            this.cameraBase.setLocalTranslation(
-                    this.cameraNode.getLocalTranslation().x,
-                    cameraBaseY,
-                    this.cameraNode.getLocalTranslation().z
-            );
-        }
-    }
-
     private void recoil(float tpf) {
         this.targetRotation = new Vector3f().interpolateLocal(targetRotation, new Vector3f(0, 0, 0), returnSpeed * tpf);
         this.currentRotation = this.currentRotation.interpolateLocal(targetRotation, recoilSpeed * tpf);
         this.cameraNode.setLocalRotation(new Quaternion().fromAngles(currentRotation.x, currentRotation.y, currentRotation.z));
+    }
+
+    @Override
+    public EnumActorState getState() {
+        return state;
+    }
+
+    @Override
+    public void setState(EnumActorState state) {
+        this.state = state;
+    }
+
+    @Override
+    public CharacterControl getControl() {
+        return control;
     }
 
     @Override
@@ -311,7 +328,7 @@ public class Player extends Node implements Actor {
 
     @Override
     public void die() {
-        throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+        throw new UnsupportedOperationException("Not supported yet.");
     }
 
     @Override
