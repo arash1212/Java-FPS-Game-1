@@ -59,7 +59,7 @@ public class Player extends Node implements Actor {
     private final Vector3f walkDirection = new Vector3f();
     private EnumActorState state = EnumActorState.STAND_STILL;
     private final Vector3f camPosition = new Vector3f(0, 0, 0);
-    private final float mouseSensitivity = 0.8f;
+    private final float mouseSensitivity = 1.1f;
 
     //Weapons
     private final List<Weapon> weapons = new ArrayList(3);
@@ -110,10 +110,7 @@ public class Player extends Node implements Actor {
         control.setGravity(GRAVITY_SPEED);
         control.setJumpSpeed(JUMP_SPEED);
 
-        //rootNode.attachChild(cameraNode);
-        // this.attachChild(this.cameraNode);
-        this.shootables.attachChild(this);
-
+        this.rootNode.attachChild(this);
         this.addControl(control);
 
         cameraBase.getLocalTransform().getTranslation().y += 2.0f;
@@ -171,29 +168,19 @@ public class Player extends Node implements Actor {
             return;
         }
 
-        float h = inputState.mouseDeltaXY.getX() / 1024;
-        float v = inputState.mouseDeltaXY.getY() / 1024;
-
-        // System.out.println("h : " + h + " v : " + v);
-        //TODO : Fix beshe
-        if (h == 9.765625E-4 || h == -9.765625E-4) {
-            h = 0;
-        }
-        if (v == 9.765625E-4 || v == -9.765625E-4) {
-            v = 0;
-        }
-
+        float h = inputState.mouseXY.getX() / 1024;
+        float v = inputState.mouseXY.getY() / 1024;
         //camera rotation
         // this.cameraNode.rotate(new Quaternion().fromAngles(-v, 0, 0));
         this.cameraBase.rotate(new Quaternion().fromAngles(-v * mouseSensitivity, 0, 0));
-        if (v != 0) {
-            v = 0;
+        if (inputState.mouseXY.y != 0) {
+            inputState.mouseXY.y = 0;
         }
 
         //control rotations
-        if (h != 0) {
+        if (inputState.mouseXY.x != 0) {
             angles[1] += -h * mouseSensitivity;
-            h = 0;
+            inputState.mouseXY.x = 0;
         }
 
         viewDirection = control.getViewDirection();
@@ -307,10 +294,6 @@ public class Player extends Node implements Actor {
                     this.cameraNode.getLocalTranslation().z
             );
         }
-    }
-
-    public Vector3f getTargetRotation() {
-        return this.targetRotation;
     }
 
     private void recoil(float tpf) {

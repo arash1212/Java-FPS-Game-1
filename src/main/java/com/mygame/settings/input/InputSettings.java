@@ -44,10 +44,12 @@ public class InputSettings {
     private final InputState inputState = InputState.getInstance();
 
     private Vector2f mouseDeltaXY = new Vector2f();
+    private Vector2f mouseXY = new Vector2f();
 
     public InputSettings() {
         this.inputManager = Managers.getInstance().getInputManager();
         this.inputState.mouseDeltaXY = this.mouseDeltaXY;
+        this.inputState.mouseXY = this.mouseXY;
     }
 
     public void initInputs() {
@@ -62,7 +64,6 @@ public class InputSettings {
 
 //        inputManager.addMapping("Rotate_Left", new MouseAxisTrigger(MouseInput.AXIS_X, true));
 //        inputManager.addMapping("Rotate_Right", new MouseAxisTrigger(MouseInput.AXIS_X, false));
-
         this.inputManager.addListener(this.actionListener, LEFT, RIGHT, FORWARD, BACKWARD, JUMP, RUN, FIRE, AIM);
         this.inputManager.addRawInputListener(this.inputListener);
 //        this.inputManager.addListener(analogListener, "Rotate_Left", "Rotate_Right");
@@ -112,7 +113,6 @@ public class InputSettings {
 //            }
 //        }
 //    };
-
     private final RawInputListener inputListener = new RawInputListener() {
         @Override
         public void beginInput() {
@@ -133,6 +133,7 @@ public class InputSettings {
         @Override
         public void onMouseMotionEvent(MouseMotionEvent evt) {
             mouseDeltaXY.set(evt.getDX(), evt.getDY());
+            mouseXY.set(evt.getDX(), evt.getDY());
             // inputState.mouseDeltaXY = mouseDeltaXY;
         }
 

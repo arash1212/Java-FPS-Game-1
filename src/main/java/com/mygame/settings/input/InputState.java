@@ -18,7 +18,7 @@ public class InputState {
     }
 
     //Mouse
-    public Vector2f mouseDeltaXY;
+    public Vector2f mouseDeltaXY, mouseXY;
 
     //Movement
     public boolean isPressedLeft, isPressedRight, isPressedForward, isPressedBackward, isPressedJump, isPressedRun;

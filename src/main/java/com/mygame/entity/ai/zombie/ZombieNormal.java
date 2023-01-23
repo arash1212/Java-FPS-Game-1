@@ -39,7 +39,7 @@ public class ZombieNormal extends Node implements AIControllable {
     //constants
     private static final float HEIGHT = 2.7f;
     private static final String PATH_TO_MODEL = "Models/zombies/zombieNormal/ZombieNormal.j3o";
-    private static float MAX_ATTACK_DISTANCE = 4.f;
+    private static final float MAX_ATTACK_DISTANCE = 4.f;
     private float currentTime = 0;
 
     //anim constants
@@ -70,8 +70,8 @@ public class ZombieNormal extends Node implements AIControllable {
     private CharacterControl control;
     private NavMeshPathfinder pathfinder;
     private Actor target;
-    private Vector3f currentNavigationPosition = new Vector3f(0, 0, 0);
-    private Vector3f lastTargetPosition = new Vector3f(0, 0, 0);
+    private final Vector3f currentNavigationPosition = new Vector3f(0, 0, 0);
+    private final Vector3f lastTargetPosition = new Vector3f(0, 0, 0);
 
     //detection
     private float detectionAmount = 0.0f;
@@ -334,7 +334,7 @@ public class ZombieNormal extends Node implements AIControllable {
             }
         }
 
-        if (!this.canAttack()) {
+        if (!this.canAttack() && isAlreadyAttacked) {
             this.isAlreadyAttacked = false;
         }
     }
