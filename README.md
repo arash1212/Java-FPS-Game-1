@@ -1,6 +1,6 @@
-# Java-FPS-Game-1
+# Project Assets
 
-Project Assets :
-(Copy Assets Folder to Project Root Directory)
+Download Assets :
+(Copy "assets" Folder to Project Root Directory)
 
-https://file.io/p5vmn8xfGhoO
+https://usaupload.com/6RbI/assets.zip
