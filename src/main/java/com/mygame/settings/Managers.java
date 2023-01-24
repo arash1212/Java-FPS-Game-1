@@ -18,6 +18,7 @@ import com.jme3.system.Timer;
 import com.mygame.entity.interfaces.Actor;
 import com.mygame.levels.Level;
 import com.mygame.settings.input.InputState;
+import java.util.List;
 
 /**
  *
@@ -38,6 +39,7 @@ public class Managers {
     private Level currentlyLoadedLevel;
     private Actor player;
     private Timer timer;
+    private List<Actor> actors;
 
     private final static Managers instance = new Managers();
 
@@ -154,6 +156,14 @@ public class Managers {
 
     public void setTimer(Timer timer) {
         this.timer = timer;
+    }
+
+    public List<Actor> getActors() {
+        return actors;
+    }
+
+    public void setActors(List<Actor> actors) {
+        this.actors = actors;
     }
 
 }

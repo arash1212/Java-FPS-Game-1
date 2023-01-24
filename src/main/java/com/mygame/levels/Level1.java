@@ -26,6 +26,7 @@ public class Level1 implements Level {
     private static final Vector3f PLAYER_SPAWN_POINT = new Vector3f(4, -2, 0);
 
     public Level1() {
+        Managers.getInstance().setActors(actors);
     }
 
     @Override
@@ -43,9 +44,9 @@ public class Level1 implements Level {
         for (Actor actor : actors) {
             actor.update(tpf);
 
-            if (actor.getHealth() <= 0) {
-                this.actors.remove(actor);
-            }
+//            if (actor.getHealth() <= 0) {
+//                this.actors.remove(actor);
+//            }
 
             //Testing
             if (actors.size() <= 1) {

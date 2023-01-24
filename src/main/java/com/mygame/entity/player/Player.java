@@ -76,7 +76,7 @@ public class Player extends Node implements Actor {
     private float headBobTimer = 0;
     private final float headBobWalkSpeed = 8.8f;
     private final float headBobRunSpeed = 13.6f;
-    private final float headBobAmount = 0.3f;
+    private final float headBobAmount = 0.2f;
 
     //Camera
     private Vector3f viewDirection = new Vector3f();
@@ -233,7 +233,6 @@ public class Player extends Node implements Actor {
 
         this.walkDirection.y = 0;
         this.control.setWalkDirection(this.walkDirection.normalizeLocal().divide(currentSpeed));
-        // this.cameraNode.setLocalTranslation(this.camPosition);
     }
 
     private void headBob(float tpf) {

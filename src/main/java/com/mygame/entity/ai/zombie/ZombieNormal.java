@@ -7,27 +7,38 @@ package com.mygame.entity.ai.zombie;
 import com.jme3.ai.navmesh.NavMesh;
 import com.jme3.ai.navmesh.NavMeshPathfinder;
 import com.jme3.anim.AnimComposer;
+import com.jme3.anim.Armature;
 import com.jme3.anim.tween.Tween;
 import com.jme3.anim.tween.Tweens;
 import com.jme3.anim.tween.action.Action;
 import com.jme3.asset.AssetManager;
 import com.jme3.bullet.BulletAppState;
+import com.jme3.bullet.animation.DacConfiguration;
+import com.jme3.bullet.animation.DynamicAnimControl;
+import com.jme3.bullet.animation.RangeOfMotion;
 import com.jme3.bullet.collision.PhysicsRayTestResult;
 import com.jme3.bullet.collision.shapes.CapsuleCollisionShape;
 import com.jme3.bullet.control.CharacterControl;
 import com.jme3.collision.CollisionResult;
 import com.jme3.collision.CollisionResults;
+import com.jme3.material.Material;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
+import com.jme3.math.Triangle;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.shape.Box;
+import com.jme3.system.Timer;
 import com.mygame.entity.interfaces.AIControllable;
 import com.mygame.entity.interfaces.Actor;
 import com.mygame.entity.interfaces.EnumActorState;
 import com.mygame.settings.GeneralConstants;
 import com.mygame.settings.GeneralUtils;
 import com.mygame.settings.Managers;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,7 +51,8 @@ public class ZombieNormal extends Node implements AIControllable {
     private static final float HEIGHT = 2.7f;
     private static final String PATH_TO_MODEL = "Models/zombies/zombieNormal/ZombieNormal.j3o";
     private static final float MAX_ATTACK_DISTANCE = 4.f;
-    private float currentTime = 0;
+    private static final float SPEED = 10;
+    private static final float MAX_PATROL_DISTANCE = 25.f;
 
     //anim constants
     private static final String ANIM_ACTION_IDLE = "Idle";
@@ -65,6 +77,8 @@ public class ZombieNormal extends Node implements AIControllable {
     private final AssetManager assetManager;
     private final BulletAppState bullAppState;
     private final Node shootables;
+    private final Timer timer;
+    private final List<Actor> actors;
 
     //Navigation
     private CharacterControl control;
@@ -72,6 +86,14 @@ public class ZombieNormal extends Node implements AIControllable {
     private Actor target;
     private final Vector3f currentNavigationPosition = new Vector3f(0, 0, 0);
     private final Vector3f lastTargetPosition = new Vector3f(0, 0, 0);
+    private Geometry navMeshGeom;
+    private List<Triangle> triangles;
+    private boolean isAttacking = false;
+
+    //Patrol
+    private Vector3f patrolPoint = new Vector3f();
+    private Vector3f initialPos;
+    private float timeBetweenChangingPoint = 2.f;
 
     //detection
     private float detectionAmount = 0.0f;
@@ -88,15 +110,28 @@ public class ZombieNormal extends Node implements AIControllable {
     private float timeBetweenAttacks = 1.f;
     private boolean isAlreadyAttacked = false;
 
+    //Dead
+    private float timeToRemoveActor = 2.f;
+    private boolean shouldRemoveActor = false;
+
+    //tests
+    private Spatial model;
+    DynamicAnimControl ragdoll;
+
+    Geometry testPatrolBox;
+
     public ZombieNormal() {
         this.assetManager = Managers.getInstance().getAsseManager();
         this.bullAppState = Managers.getInstance().getBulletAppState();
         this.shootables = Managers.getInstance().getShooteables();
+        this.timer = Managers.getInstance().getTimer();
+        this.actors = Managers.getInstance().getActors();
     }
 
     private void init() {
-        Spatial model = this.assetManager.loadModel(PATH_TO_MODEL);
+        model = this.assetManager.loadModel(PATH_TO_MODEL);
         this.animComposer = ((Node) model).getChild(0).getControl(AnimComposer.class);
+        initTweens(this.getState());
 
         CapsuleCollisionShape capsule = new CapsuleCollisionShape(1.3f, HEIGHT, 1);
         this.control = new CharacterControl(capsule, 1.001f);
@@ -109,8 +144,30 @@ public class ZombieNormal extends Node implements AIControllable {
         this.attachChild(model);
         this.addControl(control);
 
+        this.initialPos = new Vector3f(this.getPosition());
         this.animComposer.setCurrentAction("Idle");
 
+        //Ragdoll (Test)
+        ragdoll = new DynamicAnimControl();
+        ragdoll.setMass(DacConfiguration.torsoName, 1f);
+        ragdoll.link("mixamorig:Spine", 0.1f, new RangeOfMotion(5.1f, -5.1f, 5.1f, -5.1f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:Spine1", 0.1f, new RangeOfMotion(6.1f, -5.1f, 5.1f, -5.1f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:Spine2", 1.1f, new RangeOfMotion(6.4f, -5.4f, 5.8f, -5.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:Neck", 1.1f, new RangeOfMotion(0.4f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:Head", 0.1f, new RangeOfMotion(0.4f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:LeftShoulder", 0.1f, new RangeOfMotion(0.4f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:RightShoulder", 0.1f, new RangeOfMotion(0.4f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:RightForeArm", 0.1f, new RangeOfMotion(0.4f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:LeftForeArm", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:LeftUpLeg", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:RightUpLeg", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:RightLeg", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:LeftLeg", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:RightFoot", 0.1f, new RangeOfMotion(1f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.link("mixamorig:LeftFoot", 0.1f, new RangeOfMotion(2f, -0.4f, 0.8f, -0.8f, 0.4f, -0.4f));
+        ragdoll.setEnabled(true);
+        ((Node) this.model).getChild(0).addControl(ragdoll);
+        ragdoll.physicsTick(this.bullAppState.getPhysicsSpace(), 1);
     }
 
     @Override
@@ -123,30 +180,30 @@ public class ZombieNormal extends Node implements AIControllable {
 
     @Override
     public void update(float tpf) {
-        this.currentTime += tpf;
+        if (this.health > 0) {
+            this.updateActorState();
 
-        // if (this.pathfinder == null && Managers.getInstance().getCurrentlyLoadedLevel() != null) {
-        //     // this.target = Managers.getInstance().getPlayer();
-        // }
-        this.updateActorState();
+            this.updateAnimations();
 
-        this.updateAnimations();
+            //Patrol / follow Target
+            if (!this.isFoundTarget) {
+                this.randomPatrol();
+            } else {
+                if (this.isTargetCanBeSeen()) {
+                    this.lastTargetPosition.set(this.target.getPosition());
+                }
+                lookAtTarget(this.getLastTargetPosition());
+                this.navigateTo(this.getLastTargetPosition());
+            }
 
-        //Test
-        if (this.isFoundTarget) {
-            lookAtTarget(this.getTarget());
-            this.navigateTo(this.lastTargetPosition);
+            this.updateLastTargetPosition();
+
+            this.updateDetection(tpf);
+
+            this.attack();
+        } else {
+            this.die();
         }
-
-        this.die();
-
-        if (this.isTargetVisible()) {
-            this.lastTargetPosition.set(this.getTarget().getPosition());
-        }
-
-        this.updateDetection(tpf);
-
-        this.attack();
     }
 
     @Override
@@ -173,15 +230,17 @@ public class ZombieNormal extends Node implements AIControllable {
      * ********************************Animation*****************************************
      */
     public void updateAnimations() {
-        if (state == EnumActorState.WALKING && this.currentState != EnumActorState.WALKING) {
-            this.animComposer.setCurrentAction(ANIM_ACTION_WALK);
-            this.currentState = EnumActorState.WALKING;
-        } else if (state == EnumActorState.RUNNING && this.currentState != EnumActorState.RUNNING) {
-            this.animComposer.setCurrentAction(ANIM_ACTION_RUN);
-            this.currentState = EnumActorState.RUNNING;
-        } else if ((state == EnumActorState.STAND_STILL || state == EnumActorState.IN_AIR) && this.currentState != EnumActorState.STAND_STILL) {
-            this.animComposer.setCurrentAction(ANIM_ACTION_IDLE);
-            this.currentState = EnumActorState.STAND_STILL;
+        if (this.canMove() && this.health > 0) {
+            if (state == EnumActorState.WALKING && this.currentState != EnumActorState.WALKING && !this.isAttacking) {
+                this.animComposer.setCurrentAction(ANIM_ACTION_WALK);
+                this.currentState = EnumActorState.WALKING;
+            } else if (state == EnumActorState.RUNNING && this.currentState != EnumActorState.RUNNING) {
+                this.animComposer.setCurrentAction(ANIM_ACTION_RUN);
+                this.currentState = EnumActorState.RUNNING;
+            } else if ((state == EnumActorState.STAND_STILL || state == EnumActorState.IN_AIR) && this.currentState != EnumActorState.STAND_STILL) {
+                this.animComposer.setCurrentAction(ANIM_ACTION_IDLE);
+                this.currentState = EnumActorState.STAND_STILL;
+            }
         }
     }
 
@@ -204,6 +263,8 @@ public class ZombieNormal extends Node implements AIControllable {
     public void takeDamage(float damage, Actor attacker) {
         this.health -= damage;
 
+        this.isAlreadyAttacked = false;
+
         initTweens(this.getState());
 
         if (target == null) {
@@ -212,7 +273,7 @@ public class ZombieNormal extends Node implements AIControllable {
         if (this.detectionAmount < 1) {
             this.detectionAmount = 1;
         }
-        this.lookAtTarget(attacker);
+        this.lookAtTarget(attacker.getPosition());
         this.animComposer.setCurrentAction(ANIM_ACTION_REACT_TO_HIT_ONCE);
     }
 
@@ -246,8 +307,25 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public void die() {
         if (this.health <= 0) {
+            this.model.removeControl(control);
             this.bullAppState.getPhysicsSpace().remove(this.control);
+            this.animComposer.reset();
+            this.bullAppState.getPhysicsSpace().add(ragdoll);
+            ragdoll.setRagdollMode();
+
+            this.removeActor();
+        }
+    }
+
+    private void removeActor() {
+        if (!this.shouldRemoveActor) {
+            this.shouldRemoveActor = true;
+            this.timeToRemoveActor = this.timer.getTimeInSeconds() + this.timeToRemoveActor;
+        }
+        if (this.shouldRemoveActor && this.timer.getTimeInSeconds() >= this.timeToRemoveActor) {
+            this.bullAppState.getPhysicsSpace().remove(ragdoll);
             this.shootables.detachChild(this);
+            this.actors.remove(this);
         }
     }
 
@@ -302,9 +380,11 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public void attack() {
         if (this.isFoundTarget) {
+            float currentTime = this.timer.getTimeInSeconds();
+
             if (!this.isAlreadyAttacked && this.canAttack() && currentTime > timeBetweenAttacks) {
+                isAttacking = true;
                 int randomNum = GeneralUtils.randomInt(1, 2);
-                System.out.println("random : " + randomNum);
                 String currentAttackAnimation = "";
                 switch (randomNum) {
                     case 1:
@@ -324,13 +404,18 @@ public class ZombieNormal extends Node implements AIControllable {
                 }
 
                 this.animComposer.setCurrentAction(currentAttackAnimation);
-                timeBetweenAttacks = currentTime + (randomNum == 1 ? 1.46f : 1.18f);
+                timeBetweenAttacks = this.timer.getTimeInSeconds() + (randomNum == 1 ? 1.46f : 1.18f);
                 isAlreadyAttacked = true;
+                this.currentState = EnumActorState.ATTACKING;
             }
 
+            //apply damage
             if (this.isAlreadyAttacked && this.canAttack() && currentTime > timeBetweenAttacks) {
                 this.target.takeDamage(25, this);
-                isAlreadyAttacked = false;
+                this.isAlreadyAttacked = false;
+            }
+            if (this.isAttacking && currentTime > timeBetweenAttacks + 0.4f) {
+                isAttacking = false;
             }
         }
 
@@ -341,12 +426,49 @@ public class ZombieNormal extends Node implements AIControllable {
 
     @Override
     public boolean canMove() {
-        return this.animComposer.getCurrentAction() != this.animComposer.action(ANIM_ACTION_ATTACK1)
-                || this.animComposer.getCurrentAction() != this.animComposer.action(ANIM_ACTION_ATTACK2)
-                || this.animComposer.getCurrentAction() != this.animComposer.action(ANIM_ACTION_ATTACK3)
-                || this.animComposer.getCurrentAction() != this.animComposer.action(ANIM_ACTION_ATTACK4)
-                || this.animComposer.getCurrentAction() != this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE);
+        return !this.isAttacking
+                && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE));
 
+    }
+
+    @Override
+    public Geometry getNavMeshGeom() {
+        return this.navMeshGeom;
+    }
+
+    @Override
+    public void setNavMeshGeom(Geometry navMeshGeom) {
+        this.navMeshGeom = navMeshGeom;
+    }
+
+    @Override
+    public float getSpeed() {
+        return SPEED;
+    }
+
+    @Override
+    public Vector3f getPatrolPoint() {
+        return this.patrolPoint;
+    }
+
+    @Override
+    public Vector3f getInitiaPos() {
+        return this.initialPos;
+    }
+
+    @Override
+    public float getTimeBetweenChaningPatrolPoint() {
+        return this.timeBetweenChangingPoint;
+    }
+
+    @Override
+    public void setTimeBetweenChaningPatrolPoint(float newTime) {
+        this.timeBetweenChangingPoint = newTime;
+    }
+
+    @Override
+    public float getMaxPatrolDistance() {
+        return MAX_PATROL_DISTANCE;
     }
 
 }

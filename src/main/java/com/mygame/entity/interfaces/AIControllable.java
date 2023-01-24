@@ -8,12 +8,14 @@ import com.jme3.ai.navmesh.NavMesh;
 import com.jme3.ai.navmesh.NavMeshPathfinder;
 import com.jme3.ai.navmesh.Path.Waypoint;
 import com.jme3.bullet.collision.PhysicsRayTestResult;
+import com.jme3.math.Triangle;
 import com.jme3.math.Vector3f;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.mygame.settings.GeneralConstants;
 import com.mygame.settings.Managers;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,7 +41,11 @@ public interface AIControllable extends Actor {
             this.getControl().setWalkDirection(Vector3f.ZERO);
             this.setState(EnumActorState.ATTACKING);
         } else if (this.getPathfinder().getNextWaypoint() != null) {
-            this.setState(EnumActorState.WALKING);
+            if (this.getTarget() != null && this.isFoundTarget()) {
+                this.setState(EnumActorState.RUNNING);
+            } else {
+                this.setState(EnumActorState.WALKING);
+            }
         } else {
             this.setState(EnumActorState.STAND_STILL);
         }
@@ -62,23 +68,29 @@ public interface AIControllable extends Actor {
     /**
      * ********************************Navigation*****************************************
      */
+    float getSpeed();
+
+    Geometry getNavMeshGeom();
+
+    void setNavMeshGeom(Geometry navMeshGeom);
+
     default void initNavMesh() {
         Node node = (Node) Managers.getInstance().getAsseManager().loadModel(Managers.getInstance().getCurrentlyLoadedLevel().getPathToScene());
-        Geometry navMeshGeom = (Geometry) node.getChild(GeneralConstants.NAV_MESH_NAME);
-        NavMesh navMesh = new NavMesh(navMeshGeom.getMesh());
+        this.setNavMeshGeom((Geometry) node.getChild(GeneralConstants.NAV_MESH_NAME));
+        NavMesh navMesh = new NavMesh(this.getNavMeshGeom().getMesh());
         this.setPathfinder(new NavMeshPathfinder(navMesh));
     }
 
-    default void navigateTo(Vector3f position) {
+    default boolean navigateTo(Vector3f position) {
         if (this.getTarget() != null) {
             if (this.canMove()) {
                 if (this.getPathfinder() == null) {
                     System.out.println("This Actor Have No Pathfinder assigned.");
-                    return;
+                    return false;
                 }
                 if (this.getTarget() == null) {
                     System.out.println("This Actor Have No Target assigned.");
-                    return;
+                    return false;
                 }
 
                 this.getPathfinder().setPosition(this.getPosition());
@@ -93,11 +105,12 @@ public interface AIControllable extends Actor {
 
                 Waypoint waypoint = this.getPathfinder().getNextWaypoint();
                 if (waypoint == null) {
-                    return;
+                    //System.out.println("no waypoint");
+                    return false;
                 }
 
                 Vector3f waypointDirection = waypoint.getPosition().subtract(this.getControl().getPhysicsLocation());
-                this.getControl().setWalkDirection(waypointDirection.normalize().divide(11));
+                this.getControl().setWalkDirection(waypointDirection.normalize().divide(this.getState().equals(EnumActorState.WALKING) ? this.getSpeed() : this.getSpeed() / 2));
 
                 if (waypoint.getPosition().distance(this.getPosition()) < this.getMaxAttackDistance() && !this.getPathfinder().isAtGoalWaypoint()) {
                     this.getPathfinder().goToNextWaypoint();
@@ -108,29 +121,38 @@ public interface AIControllable extends Actor {
                     this.getControl().setWalkDirection(Vector3f.ZERO);
                 }
             } else {
-                System.out.println("Cant Move");
                 this.getControl().setWalkDirection(Vector3f.ZERO);
                 this.getPathfinder().computePath(this.getPosition());
             }
+            return true;
         } else {
             System.out.println("This Actor Have No TargetPosition.Setting Target Position to currentPosition");
+            return false;
         }
-
     }
 
     /**
      * ********************************Detection*****************************************
      */
+    default float getDetectionSpeed(float tpf) {
+        float distanceToTarget = this.getPosition().distance(this.getTarget().getPosition());
+        if (distanceToTarget < 10) {
+            return tpf * 2;
+        } else if (distanceToTarget < 20) {
+            return tpf;
+        } else {
+            return tpf / 2;
+        }
+    }
+
     default void updateDetection(float tpf) {
-        // System.out.println("amount : " + this.getDetectionAmount());
+       // System.out.println("detetcion amount : " + this.getDetectionAmount());
         if (this.getDetectionAmount() < 1) {
             if (this.isTargetVisible()) {
-                if (this.getDetectionAmount() < 1) {
-                    this.setDetectionAmount(this.getDetectionAmount() + tpf / 4);
-                }
+                this.setDetectionAmount(this.getDetectionAmount() + this.getDetectionSpeed(tpf));
             } else {
                 if (this.getDetectionAmount() > 0) {
-                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 4);
+                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 2);
                 }
             }
 
@@ -138,7 +160,9 @@ public interface AIControllable extends Actor {
         } else {
             this.setIsFoundTarget(true);
             if (this.getPosition().distance(this.getLastTargetPosition()) <= this.getMaxAttackDistance()) {
-                this.setDetectionAmount(this.getDetectionAmount() - tpf / 6);
+                if (this.getDetectionAmount() > 0) {
+                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 2);
+                }
             }
         }
     }
@@ -167,8 +191,9 @@ public interface AIControllable extends Actor {
         }
     }
 
-    default void lookAtTarget(Actor target) {
-        Vector3f dir = this.getPosition().subtract(target.getPosition());
+    default void lookAtTarget(Vector3f position) {
+        Vector3f dir = this.getPosition().subtract(position);
+        dir.y = 0;
         this.getControl().setViewDirection(dir);
 
     }
@@ -188,5 +213,72 @@ public interface AIControllable extends Actor {
     boolean isFoundTarget();
 
     void setIsFoundTarget(boolean found);
+
+    /**
+     * ********************************Patrol*****************************************
+     */
+    float getMaxPatrolDistance();
+
+    Vector3f getPatrolPoint();
+
+    Vector3f getInitiaPos();
+
+    float getTimeBetweenChaningPatrolPoint();
+
+    void setTimeBetweenChaningPatrolPoint(float newTime);
+
+    default List<Triangle> getTriangles(float distance) {
+        List<Triangle> triangles = new ArrayList();
+        if (this.getNavMeshGeom() != null) {
+            int[] indices = new int[3];
+            for (int i = 0; i < this.getNavMeshGeom().getMesh().getTriangleCount(); i++) {
+                Triangle tri = new Triangle();
+                this.getNavMeshGeom().getMesh().getTriangle(i, tri);
+                if (tri.getCenter().distance(this.getInitiaPos()) <= distance) {
+                    triangles.add(tri);
+                }
+            }
+        }
+        return triangles;
+    }
+
+    default void findRandomPoint(List<Triangle> tris) {
+        if (this.getPatrolPoint().equals(Vector3f.ZERO) || this.getPosition().distance(this.getPatrolPoint()) <= 1) {
+            if (Managers.getInstance().getTimer().getTimeInSeconds() > this.getTimeBetweenChaningPatrolPoint()) {
+                int randomTriangle = (int) (Math.random() * tris.size());
+                int randomGet = (int) (Math.random() * 3);
+                switch (randomGet) {
+                    case 1:
+                        this.getPatrolPoint().set(tris.get(randomTriangle).get1());
+                        break;
+                    case 2:
+                        this.getPatrolPoint().set(tris.get(randomTriangle).get2());
+                        break;
+                    case 3:
+                        this.getPatrolPoint().set(tris.get(randomTriangle).get3());
+                        break;
+                    default:
+                        break;
+                }
+            }
+        } else if (this.getPosition().distance(this.getPatrolPoint()) > 1) {
+            this.setTimeBetweenChaningPatrolPoint(Managers.getInstance().getTimer().getTimeInSeconds() + 5.f);
+        }
+    }
+
+    default void randomPatrol() {
+        this.findRandomPoint(this.getTriangles(this.getMaxPatrolDistance()));
+
+        lookAtTarget(this.getPatrolPoint());
+        if (!this.navigateTo(this.getPatrolPoint())) {
+            this.getPatrolPoint().set(new Vector3f(0, 0, 0));
+        }
+    }
+
+    default void updateLastTargetPosition() {
+        if (this.isTargetVisible()) {
+            this.getLastTargetPosition().set(this.getTarget().getPosition());
+        }
+    }
 
 }
