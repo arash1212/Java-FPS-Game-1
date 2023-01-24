@@ -35,6 +35,8 @@ public interface AIControllable extends Actor {
 
     Vector3f getCurrentNavigationPosition();
 
+    void setCurrentNavigationPosition(Vector3f position);
+
     @Override
     default void updateActorState() {
         if (this.getTarget() != null && this.canAttack()) {
@@ -94,18 +96,19 @@ public interface AIControllable extends Actor {
                 }
 
                 this.getPathfinder().setPosition(this.getPosition());
-                if (!this.getCurrentNavigationPosition().equals(position)) {
-                    this.getCurrentNavigationPosition().set(position);
-                    // this.getPathfinder().clearPath();
-                    this.getPathfinder().computePath(this.getCurrentNavigationPosition());
 
+                if (!(this.getCurrentNavigationPosition().isSimilar(position, 2))) {
+                    this.setCurrentNavigationPosition(position);
+                    //this.getPathfinder().clearPath();
+                    this.getPathfinder().computePath(this.getCurrentNavigationPosition());
+//                    System.out.println("computing new path ?");
                 }
 
                 this.getControl().setWalkDirection(Vector3f.ZERO);
 
                 Waypoint waypoint = this.getPathfinder().getNextWaypoint();
                 if (waypoint == null) {
-                    //System.out.println("no waypoint");
+                    System.out.println("no waypoint");
                     return false;
                 }
 
@@ -121,6 +124,7 @@ public interface AIControllable extends Actor {
                     this.getControl().setWalkDirection(Vector3f.ZERO);
                 }
             } else {
+                // System.out.println("cant walks");
                 this.getControl().setWalkDirection(Vector3f.ZERO);
                 this.getPathfinder().computePath(this.getPosition());
             }
@@ -146,7 +150,7 @@ public interface AIControllable extends Actor {
     }
 
     default void updateDetection(float tpf) {
-       // System.out.println("detetcion amount : " + this.getDetectionAmount());
+        // System.out.println("detetcion amount : " + this.getDetectionAmount());
         if (this.getDetectionAmount() < 1) {
             if (this.isTargetVisible()) {
                 this.setDetectionAmount(this.getDetectionAmount() + this.getDetectionSpeed(tpf));

@@ -51,7 +51,7 @@ public class ZombieNormal extends Node implements AIControllable {
     private static final float HEIGHT = 2.7f;
     private static final String PATH_TO_MODEL = "Models/zombies/zombieNormal/ZombieNormal.j3o";
     private static final float MAX_ATTACK_DISTANCE = 4.f;
-    private static final float SPEED = 10;
+    private static final float SPEED = 12;
     private static final float MAX_PATROL_DISTANCE = 25.f;
 
     //anim constants
@@ -109,6 +109,7 @@ public class ZombieNormal extends Node implements AIControllable {
     //Attack
     private float timeBetweenAttacks = 1.f;
     private boolean isAlreadyAttacked = false;
+    private float currentTime;
 
     //Dead
     private float timeToRemoveActor = 2.f;
@@ -188,10 +189,7 @@ public class ZombieNormal extends Node implements AIControllable {
             //Patrol / follow Target
             if (!this.isFoundTarget) {
                 this.randomPatrol();
-            } else {
-                if (this.isTargetCanBeSeen()) {
-                    this.lastTargetPosition.set(this.target.getPosition());
-                }
+            } else if (this.isFoundTarget) {
                 lookAtTarget(this.getLastTargetPosition());
                 this.navigateTo(this.getLastTargetPosition());
             }
@@ -380,7 +378,7 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public void attack() {
         if (this.isFoundTarget) {
-            float currentTime = this.timer.getTimeInSeconds();
+            this.currentTime = this.timer.getTimeInSeconds();
 
             if (!this.isAlreadyAttacked && this.canAttack() && currentTime > timeBetweenAttacks) {
                 isAttacking = true;
@@ -469,6 +467,11 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public float getMaxPatrolDistance() {
         return MAX_PATROL_DISTANCE;
+    }
+
+    @Override
+    public void setCurrentNavigationPosition(Vector3f position) {
+        this.currentNavigationPosition.set(position);
     }
 
 }
