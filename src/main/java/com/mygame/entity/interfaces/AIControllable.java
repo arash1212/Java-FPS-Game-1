@@ -97,7 +97,7 @@ public interface AIControllable extends Actor {
 
                 this.getPathfinder().setPosition(this.getPosition());
 
-                if (!(this.getCurrentNavigationPosition().isSimilar(position, 0.1f))) {
+                if (!(this.getCurrentNavigationPosition().isSimilar(position, 0.45f))) {
                     this.setCurrentNavigationPosition(position);
                     //this.getPathfinder().clearPath();
                     this.getPathfinder().computePath(this.getCurrentNavigationPosition());
@@ -113,7 +113,7 @@ public interface AIControllable extends Actor {
                 }
 
                 Vector3f waypointDirection = waypoint.getPosition().subtract(this.getControl().getPhysicsLocation());
-                this.getControl().setWalkDirection(waypointDirection.normalize().divide(this.getState().equals(EnumActorState.WALKING) ? this.getSpeed() : this.getSpeed() / 2));
+                this.getControl().setWalkDirection(waypointDirection.normalize().divide(this.getState().equals(EnumActorState.WALKING) ? this.getSpeed() : this.getSpeed() / 2.5f));
 
                 if (waypoint.getPosition().distance(this.getPosition()) < this.getMaxAttackDistance() && !this.getPathfinder().isAtGoalWaypoint()) {
                     this.getPathfinder().goToNextWaypoint();
