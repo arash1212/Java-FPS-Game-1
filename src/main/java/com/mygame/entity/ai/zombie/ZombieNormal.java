@@ -87,8 +87,6 @@ public class ZombieNormal extends Node implements AIControllable {
     private final Vector3f currentNavigationPosition = new Vector3f(0, 0, 0);
     private final Vector3f lastTargetPosition = new Vector3f(0, 0, 0);
     private Geometry navMeshGeom;
-    private List<Triangle> triangles;
-    private boolean isAttacking = false;
 
     //Patrol
     private Vector3f patrolPoint = new Vector3f();
@@ -104,6 +102,7 @@ public class ZombieNormal extends Node implements AIControllable {
     private EnumActorState currentState = EnumActorState.STAND_STILL;
     private Action reactToHit;
 
+    private boolean isAttacking = false;
     private EnumActorState state = EnumActorState.STAND_STILL;
 
     //Attack

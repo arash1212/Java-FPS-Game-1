@@ -97,7 +97,7 @@ public interface AIControllable extends Actor {
 
                 this.getPathfinder().setPosition(this.getPosition());
 
-                if (!(this.getCurrentNavigationPosition().isSimilar(position, 2))) {
+                if (!(this.getCurrentNavigationPosition().isSimilar(position, 0.1f))) {
                     this.setCurrentNavigationPosition(position);
                     //this.getPathfinder().clearPath();
                     this.getPathfinder().computePath(this.getCurrentNavigationPosition());
@@ -126,7 +126,7 @@ public interface AIControllable extends Actor {
             } else {
                 // System.out.println("cant walks");
                 this.getControl().setWalkDirection(Vector3f.ZERO);
-                this.getPathfinder().computePath(this.getPosition());
+//                this.getPathfinder().computePath(this.getPosition());
             }
             return true;
         } else {
