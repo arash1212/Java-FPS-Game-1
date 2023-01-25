@@ -24,6 +24,8 @@ import java.util.List;
  */
 public interface AIControllable extends Actor {
 
+    float MAX_IGNORED_ATTACK_DISTANCE = 0.55f;
+
     // void initNavMesh();
     NavMeshPathfinder getPathfinder();
 
@@ -60,7 +62,7 @@ public interface AIControllable extends Actor {
 
     default boolean canAttack() {
         float distanceToTarget = this.getPosition().distance(this.getTarget().getPosition());
-        return distanceToTarget <= this.getMaxAttackDistance();
+        return distanceToTarget <= this.getMaxAttackDistance() + MAX_IGNORED_ATTACK_DISTANCE;
     }
 
     void attack();
@@ -86,47 +88,50 @@ public interface AIControllable extends Actor {
     default boolean navigateTo(Vector3f position) {
         if (this.getTarget() != null) {
             if (this.canMove()) {
-                if (this.getPathfinder() == null) {
-                    System.out.println("This Actor Have No Pathfinder assigned.");
-                    return false;
-                }
-                if (this.getTarget() == null) {
-                    System.out.println("This Actor Have No Target assigned.");
-                    return false;
-                }
+                if (this.getControl().onGround()) {
+                    if (this.getPathfinder() == null) {
+                        System.out.println("This Actor Have No Pathfinder assigned.");
+                        return false;
+                    }
+                    if (this.getTarget() == null) {
+                        System.out.println("This Actor Have No Target assigned.");
+                        return false;
+                    }
 
-                this.getPathfinder().setPosition(this.getPosition());
+                    this.getPathfinder().setPosition(this.getPosition());
 
-                if (!(this.getCurrentNavigationPosition().isSimilar(position, 0.45f))) {
-                    this.setCurrentNavigationPosition(position);
-                    //this.getPathfinder().clearPath();
-                    this.getPathfinder().computePath(this.getCurrentNavigationPosition());
+                    if (!(this.getCurrentNavigationPosition().isSimilar(position, MAX_IGNORED_ATTACK_DISTANCE))) {
+                        this.setCurrentNavigationPosition(position);
+                        //this.getPathfinder().clearPath();
+                        this.getPathfinder().computePath(this.getCurrentNavigationPosition());
 //                    System.out.println("computing new path ?");
-                }
+                    }
 
-                this.getControl().setWalkDirection(Vector3f.ZERO);
+                    this.getControl().setWalkDirection(new Vector3f(0, 0, 0));
 
-                Waypoint waypoint = this.getPathfinder().getNextWaypoint();
-                if (waypoint == null) {
-                    System.out.println("no waypoint");
-                    return false;
-                }
+                    Waypoint waypoint = this.getPathfinder().getNextWaypoint();
+                    if (waypoint == null) {
+                        //System.out.println("no waypoint");
+                        return false;
+                    }
 
-                Vector3f waypointDirection = waypoint.getPosition().subtract(this.getControl().getPhysicsLocation());
-                this.getControl().setWalkDirection(waypointDirection.normalize().divide(this.getState().equals(EnumActorState.WALKING) ? this.getSpeed() : this.getSpeed() / 2.5f));
+                    Vector3f waypointDirection = waypoint.getPosition().subtract(this.getControl().getPhysicsLocation());
+                    this.getControl().setWalkDirection(waypointDirection.normalize().divide(this.getState().equals(EnumActorState.WALKING) ? this.getSpeed() : this.getSpeed() / 3.5f));
 
-                if (waypoint.getPosition().distance(this.getPosition()) < this.getMaxAttackDistance() && !this.getPathfinder().isAtGoalWaypoint()) {
-                    this.getPathfinder().goToNextWaypoint();
-                }
+                    if (waypoint.getPosition().distance(this.getPosition()) < this.getMaxAttackDistance() && !this.getPathfinder().isAtGoalWaypoint()) {
+                        this.getPathfinder().goToNextWaypoint();
+                    }
 
-                if (this.getPathfinder().isAtGoalWaypoint()) {
-                    this.getPathfinder().clearPath();
-                    this.getControl().setWalkDirection(Vector3f.ZERO);
+                    if (this.getPathfinder().isAtGoalWaypoint()) {
+                        this.getPathfinder().clearPath();
+                        this.getControl().setWalkDirection(new Vector3f(0, 0, 0));
+                    }
                 }
             } else {
-                // System.out.println("cant walks");
-                this.getControl().setWalkDirection(Vector3f.ZERO);
-//                this.getPathfinder().computePath(this.getPosition());
+                System.out.println("cant walk");
+                this.getControl().setWalkDirection(new Vector3f(0, 0, 0));
+                this.getPathfinder().computePath(this.getPosition());
+                this.setCurrentNavigationPosition(this.getPosition());
             }
             return true;
         } else {
@@ -193,13 +198,6 @@ public interface AIControllable extends Actor {
         } else {
             return false;
         }
-    }
-
-    default void lookAtTarget(Vector3f position) {
-        Vector3f dir = this.getPosition().subtract(position);
-        dir.y = 0;
-        this.getControl().setViewDirection(dir);
-
     }
 
     default void losetarget() {

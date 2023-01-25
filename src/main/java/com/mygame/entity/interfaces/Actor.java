@@ -35,6 +35,16 @@ public interface Actor {
 
     boolean isRunning();
 
+    boolean isGrabbed();
+
+    void setIsGrabbed(boolean grabbed);
+
+    default void lookAtTarget(Vector3f position) {
+        Vector3f dir = this.getPosition().subtract(position);
+        dir.y = 0;
+        this.getControl().setViewDirection(dir);
+    }
+
     default void updateActorState() {
         if (this.getControl().onGround()) {
             if (!this.getControl().getWalkDirection().equals(Vector3f.ZERO)) {
@@ -54,6 +64,8 @@ public interface Actor {
     default Vector3f getPosition() {
         return this.getControl().getPhysicsLocation();
     }
+
+    void setPosition(Vector3f position);
 
     void takeDamage(float damage, Actor attacker);
 

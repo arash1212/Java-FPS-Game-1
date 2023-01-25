@@ -62,6 +62,7 @@ public class Player extends Node implements Actor {
     private EnumActorState state = EnumActorState.STAND_STILL;
     private final Vector3f camPosition = new Vector3f(0, 0, 0);
     private final float mouseSensitivity = 1.1f;
+    private boolean isGrabbed = false;
 
     //Weapons
     private final List<Weapon> weapons = new ArrayList(3);
@@ -108,6 +109,7 @@ public class Player extends Node implements Actor {
         CapsuleCollisionShape capsule = new CapsuleCollisionShape(1.3f, HEIGHT, 1);
         control = new CharacterControl(capsule, 0.1f);
         control.setSpatial(this);
+        this.control.setUseViewDirection(true);
         this.bulletAppSate.getPhysicsSpace().add(control);
 
         control.setGravity(GRAVITY_SPEED);
@@ -117,6 +119,7 @@ public class Player extends Node implements Actor {
         this.addControl(control);
 
         cameraBase.getLocalTransform().getTranslation().y += 2.0f;
+
         cameraBaseY = cameraBase.getLocalTransform().getTranslation().y;
         cameraBaseX = cameraBase.getLocalTransform().getTranslation().x;
         cameraBase.attachChild(cameraNode);
@@ -134,6 +137,8 @@ public class Player extends Node implements Actor {
 
     @Override
     public void update(float tpf) {
+
+        cameraBase.getLocalRotation().lookAt(this.control.getViewDirection(), Vector3f.UNIT_Z);
 
         this.cam.setFov(currentFov);
 
@@ -207,32 +212,34 @@ public class Player extends Node implements Actor {
     }
 
     private void updateMovements(float tpf) {
-        setCurrentSpeed();
+        if (!this.isGrabbed) {
+            setCurrentSpeed();
 
-        this.camPosition.set(this.getPosition().x, this.getPosition().y + HEIGHT, this.getPosition().z);
+            this.camPosition.set(this.getPosition().x, this.getPosition().y + HEIGHT, this.getPosition().z);
 
-        this.camDir.set(cam.getDirection());
-        this.camLeft.set(cam.getLeft());
+            this.camDir.set(cam.getDirection());
+            this.camLeft.set(cam.getLeft());
 
-        this.walkDirection.set(0, 0, 0);
-        if (inputState.isPressedLeft) {
-            this.walkDirection.addLocal(camLeft);
-        }
-        if (this.inputState.isPressedRight) {
-            walkDirection.addLocal(camLeft.negate());
-        }
-        if (inputState.isPressedForward) {
-            this.walkDirection.addLocal(camDir);
-        }
-        if (inputState.isPressedBackward) {
-            this.walkDirection.addLocal(camDir.negate());
-        }
-        if (inputState.isPressedJump && this.canJump()) {
-            this.control.jump();
-        }
+            this.walkDirection.set(0, 0, 0);
+            if (inputState.isPressedLeft) {
+                this.walkDirection.addLocal(camLeft);
+            }
+            if (this.inputState.isPressedRight) {
+                walkDirection.addLocal(camLeft.negate());
+            }
+            if (inputState.isPressedForward) {
+                this.walkDirection.addLocal(camDir);
+            }
+            if (inputState.isPressedBackward) {
+                this.walkDirection.addLocal(camDir.negate());
+            }
+            if (inputState.isPressedJump && this.canJump()) {
+                this.control.jump();
+            }
 
-        this.walkDirection.y = 0;
-        this.control.setWalkDirection(this.walkDirection.normalizeLocal().divide(currentSpeed));
+            this.walkDirection.y = 0;
+            this.control.setWalkDirection(this.walkDirection.normalizeLocal().divide(currentSpeed));
+        }
     }
 
     private void headBob(float tpf) {
@@ -282,6 +289,7 @@ public class Player extends Node implements Actor {
     }
 
     private void aim(float tpf) {
+        // System.out.println("fov : " + this.cam.getFov());
         if (this.selectedWeapon != null) {
             if (this.inputState.isPressedAim) {
                 if (this.currentFov > 40) {
@@ -337,6 +345,19 @@ public class Player extends Node implements Actor {
 
     public void addRecoil(float recoilX, float recoilY, float recoilZ) {
         this.targetRotation.addLocal(recoilX, recoilY, recoilZ);
+    }
+
+    @Override
+    public void setPosition(Vector3f position) {
+        this.control.setPhysicsLocation(position);
+    }
+
+    public boolean isGrabbed() {
+        return isGrabbed;
+    }
+
+    public void setIsGrabbed(boolean isGrabbed) {
+        this.isGrabbed = isGrabbed;
     }
 
 }
