@@ -143,7 +143,11 @@ public class Player extends Node implements Actor {
         this.cam.setFov(currentFov);
 
         updateCamera(tpf);
-        updateMovements(tpf);
+
+        if (this.canMove()) {
+            this.updateMovements(tpf);
+            this.headBob(tpf);
+        }
 
         updateActorState();
 
@@ -156,9 +160,8 @@ public class Player extends Node implements Actor {
 
         this.aim(tpf);
 
-        this.headBob(tpf);
-
         this.recoil(tpf);
+
     }
 
     /**
@@ -327,7 +330,7 @@ public class Player extends Node implements Actor {
     }
 
     @Override
-    public void takeDamage(float damage, Actor attackers) {
+    public void applyDamage(float damage, Actor attackers) {
         //this.health -= damage;
 
         this.targetRotation.addLocal((float) (Math.random() * (1.f - 0.6f) + 0.6f), 0, 0);
@@ -358,6 +361,16 @@ public class Player extends Node implements Actor {
 
     public void setIsGrabbed(boolean isGrabbed) {
         this.isGrabbed = isGrabbed;
+    }
+
+    @Override
+    public boolean canMove() {
+        return !this.isGrabbed;
+    }
+
+    @Override
+    public boolean isDeath() {
+        return false;
     }
 
 }

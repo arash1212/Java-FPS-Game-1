@@ -83,7 +83,7 @@ public interface Weapon {
                 }
             }
             if (actorObject instanceof Actor) {
-                ((Actor) actorObject).takeDamage(this.calculateDamage(hitObject), this.getOwner());
+                ((Actor) actorObject).applyDamage(this.calculateDamage(hitObject), this.getOwner());
                 break;
             }
         }

@@ -44,10 +44,6 @@ public class Level1 implements Level {
         for (Actor actor : actors) {
             actor.update(tpf);
 
-//            if (actor.getHealth() <= 0) {
-//                this.actors.remove(actor);
-//            }
-
             //Testing
             if (actors.size() <= 1) {
                 this.spawnZombies();

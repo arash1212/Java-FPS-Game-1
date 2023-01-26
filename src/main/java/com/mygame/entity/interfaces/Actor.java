@@ -23,6 +23,8 @@ public interface Actor {
 
     void update(float tpf);
 
+    boolean canMove();
+
     default boolean canJump() {
         return this.getState() != EnumActorState.IN_AIR;
     }
@@ -53,7 +55,7 @@ public interface Actor {
                 } else {
                     this.setState(EnumActorState.RUNNING);
                 }
-            } else if (this.getControl().getWalkDirection().equals(Vector3f.ZERO)) {
+            } else if (this.getControl().getWalkDirection().equals(Vector3f.ZERO) || this.isGrabbed()) {
                 this.setState(EnumActorState.STAND_STILL);
             }
         } else {
@@ -67,7 +69,7 @@ public interface Actor {
 
     void setPosition(Vector3f position);
 
-    void takeDamage(float damage, Actor attacker);
+    void applyDamage(float damage, Actor attacker);
 
     void die();
 
@@ -83,4 +85,14 @@ public interface Actor {
     default List<PhysicsRayTestResult> physicsTayTo(Vector3f from, Vector3f to) {
         return Managers.getInstance().getBulletAppState().getPhysicsSpace().rayTest(from, to);
     }
+
+    default void jumpTowards(Vector3f target, float jumpSpeed, float speedDivide) {
+        Vector3f jumpDirection = this.getPosition().subtract(target);
+        this.setState(EnumActorState.IN_AIR);
+        this.getControl().setJumpSpeed(jumpSpeed);
+        this.getControl().jump();
+        this.getControl().setWalkDirection(jumpDirection.negate().normalize().divide(speedDivide));
+    }
+
+    boolean isDeath();
 }

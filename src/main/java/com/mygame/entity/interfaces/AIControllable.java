@@ -41,7 +41,9 @@ public interface AIControllable extends Actor {
 
     @Override
     default void updateActorState() {
-        if (this.getTarget() != null && this.canAttack()) {
+        if (!this.getControl().onGround()) {
+            this.setState(EnumActorState.IN_AIR);
+        } else if (this.getTarget() != null && this.canAttack()) {
             this.getControl().setWalkDirection(Vector3f.ZERO);
             this.setState(EnumActorState.ATTACKING);
         } else if (this.getPathfinder().getNextWaypoint() != null) {
@@ -66,8 +68,6 @@ public interface AIControllable extends Actor {
     }
 
     void attack();
-
-    boolean canMove();
 
     /**
      * ********************************Navigation*****************************************
@@ -128,7 +128,7 @@ public interface AIControllable extends Actor {
                     }
                 }
             } else {
-                System.out.println("cant walk");
+//                System.out.println("cant walk");
                 this.getControl().setWalkDirection(new Vector3f(0, 0, 0));
                 this.getPathfinder().computePath(this.getPosition());
                 this.setCurrentNavigationPosition(this.getPosition());
@@ -161,7 +161,7 @@ public interface AIControllable extends Actor {
                 this.setDetectionAmount(this.getDetectionAmount() + this.getDetectionSpeed(tpf));
             } else {
                 if (this.getDetectionAmount() > 0) {
-                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 2);
+                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 4);
                 }
             }
 
@@ -170,7 +170,7 @@ public interface AIControllable extends Actor {
             this.setIsFoundTarget(true);
             if (this.getPosition().distance(this.getLastTargetPosition()) <= this.getMaxAttackDistance()) {
                 if (this.getDetectionAmount() > 0) {
-                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 2);
+                    this.setDetectionAmount(this.getDetectionAmount() - tpf / 6);
                 }
             }
         }
@@ -204,6 +204,10 @@ public interface AIControllable extends Actor {
         if (this.isFoundTarget() && this.getDetectionAmount() < 0.4f) {
             this.setIsFoundTarget(false);
         }
+    }
+
+    default float distanceToTarget(Actor target) {
+        return this.getPosition().distance(target.getPosition());
     }
 
     Vector3f getLastTargetPosition();
