@@ -4,6 +4,7 @@
  */
 package com.mygame.entity.ai.zombie;
 
+import com.jme3.ai.navmesh.NavMesh;
 import com.jme3.ai.navmesh.NavMeshPathfinder;
 import com.jme3.anim.AnimComposer;
 import com.jme3.anim.tween.Tween;
@@ -24,7 +25,9 @@ import com.jme3.scene.Spatial;
 import com.jme3.system.Timer;
 import com.mygame.entity.interfaces.AIControllable;
 import com.mygame.entity.interfaces.Actor;
+import com.mygame.entity.interfaces.EnumActorGroup;
 import com.mygame.entity.interfaces.EnumActorState;
+import com.mygame.levels.Level1;
 import com.mygame.settings.GeneralUtils;
 import com.mygame.settings.Managers;
 import java.util.List;
@@ -38,14 +41,16 @@ public class ZombieNormal extends Node implements AIControllable {
     //Constants
     private static final float HEIGHT = 2.7f;
     private static final float TIME_TO_REMOVE_DEAD_BODY = 2.f;
-    private static final float MAX_ATTACK_DISTANCE = 4.f;
     private static final float SPEED = 14;
     private static final float MAX_PATROL_DISTANCE = 25.f;
+    private static final float DAMAGE_TO_PLAYER_RECOIL_AMOUNT = 0.3f;
+    private static final EnumActorGroup GROUP = EnumActorGroup.ZOMBIE;
     private static final String PATH_TO_MODEL = "Models/zombies/zombieNormal/ZombieNormal.j3o";
 
     //attack constants
     private static final float ATTACK_JUMP_DURATION = 2;
     private static final float ATTACK_BITE_DURATION = 0.5f;
+    private static final float MAX_ATTACK_DISTANCE = 4.f;
     private static final float TIME_BETWEEN_BITE_ATTACKS = 5.0f;
 
     //anim constants
@@ -78,10 +83,12 @@ public class ZombieNormal extends Node implements AIControllable {
     //Health
     private float health = 100;
     private Actor attacker;
+    private Actor grabber;
 
     //Navigation
     private CharacterControl control;
     private NavMeshPathfinder pathfinder;
+    private NavMesh navMesh;
     private Actor target;
     private final Vector3f currentNavigationPosition = new Vector3f(0, 0, 0);
     private final Vector3f lastTargetPosition = new Vector3f(0, 0, 0);
@@ -136,8 +143,6 @@ public class ZombieNormal extends Node implements AIControllable {
         this.control.setSpatial(this);
         model.setLocalRotation(new Quaternion().fromAngles(0, 110, 0));
 
-        this.initialPos = new Vector3f(this.getPosition());
-
         this.bullAppState.getPhysicsSpace().add(control);
         this.shootables.attachChild(this);
         this.attachChild(model);
@@ -155,33 +160,39 @@ public class ZombieNormal extends Node implements AIControllable {
         this.initNavMesh();
 
         this.control.setPhysicsLocation(spawnPoint);
+        this.initialPos = new Vector3f(this.getPosition());
     }
 
     @Override
     public void update(float tpf) {
         this.currentTime = this.timer.getTimeInSeconds();
 
-        if (this.health > 0) {
+        if (this.health > 0 || this.getPosition().y < -20) {
+            this.setTarget(this.chooseTarget());
+
             this.updateActorState();
 
             this.updateAnimations();
 
-            //Patrol / follow Target
-            if (!this.isFoundTarget) {
-                this.randomPatrol();
-            } else if (this.isFoundTarget) {
-                lookAtTarget(this.getLastTargetPosition());
-                this.navigateTo(this.getLastTargetPosition());
+            if (!isGrabbed) {
+                //Patrol / follow Target
+                if (!this.isFoundTarget) {
+                    this.randomPatrol();
+                } else if (this.isFoundTarget) {
+                    lookAtTarget(this.getLastTargetPosition());
+                    this.navigateTo(this.getLastTargetPosition());
+                }
+                this.attack(tpf);
             }
 
             this.updateLastTargetPosition();
 
             this.updateDetection(tpf);
 
-            this.attack();
-        } else {
-            this.die();
+            //  this.lookAtTargetCloseDistance();
         }
+        this.die();
+
     }
 
     @Override
@@ -213,6 +224,7 @@ public class ZombieNormal extends Node implements AIControllable {
                 this.animComposer.setCurrentAction(ANIM_ACTION_WALK);
                 this.currentState = EnumActorState.WALKING;
             } else if (state == EnumActorState.RUNNING && this.currentState != EnumActorState.RUNNING) {
+                System.out.println("run anim ?");
                 this.animComposer.setCurrentAction(ANIM_ACTION_RUN);
                 this.currentState = EnumActorState.RUNNING;
             } else if ((state == EnumActorState.STAND_STILL || state == EnumActorState.IN_AIR) && this.currentState != EnumActorState.STAND_STILL) {
@@ -243,15 +255,11 @@ public class ZombieNormal extends Node implements AIControllable {
 
         initReactToHitTweens(this.getState());
 
-        if (target == null) {
-            this.setTarget(attacker);
-        }
-        if (this.detectionAmount < 1) {
-            this.detectionAmount = 1;
-        }
+//        this.setTarget(attacker);
+        this.detectionAmount = 1;
 
+        this.lookAtTarget(attacker.getPosition());
         if (!this.isBiting) {
-            this.lookAtTarget(attacker.getPosition());
             this.animComposer.setCurrentAction(ANIM_ACTION_REACT_TO_HIT_ONCE);
         }
     }
@@ -292,7 +300,7 @@ public class ZombieNormal extends Node implements AIControllable {
 
     @Override
     public void die() {
-        if (this.health <= 0) {
+        if (this.health <= 0 || this.getPosition().y < -20) {
             if (!isDead) {
                 this.deadTime = this.currentTime;
                 this.isDead = true;
@@ -302,6 +310,7 @@ public class ZombieNormal extends Node implements AIControllable {
                 this.bullAppState.getPhysicsSpace().add(ragdoll);
                 ragdoll.setRagdollMode();
                 if (this.isBiting) {
+                    this.getTarget().setGrabber(null);
                     this.target.setIsGrabbed(false);
                 }
             } else {
@@ -315,6 +324,9 @@ public class ZombieNormal extends Node implements AIControllable {
             this.bullAppState.getPhysicsSpace().remove(ragdoll);
             this.shootables.detachChild(this);
             this.actors.remove(this);
+
+            //Test
+            ((Level1) Managers.getInstance().getCurrentlyLoadedLevel()).spawnZombies(this.initialPos);
         }
     }
 
@@ -363,13 +375,13 @@ public class ZombieNormal extends Node implements AIControllable {
      */
     private boolean canBiteAttack() {
         return this.target != null
-                && this.canAttack()
+                && this.isTargetInAttackRange()
                 && !this.isAttacking
                 && !this.target.isGrabbed()
                 && !this.isBiting
                 && this.isFoundTarget()
-                && this.isTargetAtFront()
-                && this.isTargetCanBeSeen()
+                && this.isTargetAtFront(this.getTarget())
+                && this.isTargetCanBeSeen(this.getTarget())
                 && this.currentTime > this.timeBetweenAttacks + ATTACK_BITE_DURATION
                 && this.currentTime > lastBiteAttackTime + TIME_BETWEEN_BITE_ATTACKS
                 && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE));
@@ -378,8 +390,8 @@ public class ZombieNormal extends Node implements AIControllable {
     private boolean canJumpAttack() {
         return this.target != null
                 && this.isFoundTarget()
-                && this.isTargetAtFront()
-                && this.isTargetCanBeSeen()
+                && this.isTargetAtFront(this.getTarget())
+                && this.isTargetCanBeSeen(this.getTarget())
                 && this.actionJumpAttackOnce != null
                 && this.control.onGround()
                 && !this.isAttacking
@@ -404,11 +416,12 @@ public class ZombieNormal extends Node implements AIControllable {
         this.isAttacking = true;
         this.isBiting = true;
         this.getTarget().getControl().setWalkDirection(new Vector3f(0, 0, 0));
+        this.getTarget().setGrabber(this);
     }
 
     private void jumpAttack() {
         this.animComposer.setCurrentAction(ANIM_ACTION_JUMP_ATTACK_ONCE);
-        this.jumpTowards(target.getPosition(), 15.f, 4.f);
+        this.jumpTowards(target.getPosition(), 15.f, 4.9f);
         this.isAttacking = true;
         timeBetweenAttacks = this.currentTime + 1.2f;
     }
@@ -428,6 +441,10 @@ public class ZombieNormal extends Node implements AIControllable {
     }
 
     private void lockTargetInPosition() {
+        if (this.getTarget() == null) {
+            return;
+        }
+
         this.target.setIsGrabbed(true);
     }
 
@@ -460,7 +477,7 @@ public class ZombieNormal extends Node implements AIControllable {
     }
 
     @Override
-    public void attack() {
+    public void attack(float tpf) {
 
         if (this.canBiteAttack()) {
             this.biteAttack();
@@ -475,7 +492,7 @@ public class ZombieNormal extends Node implements AIControllable {
         }
 
         if (this.isFoundTarget && this.control.onGround()) {
-            if (!this.isAttacking && !this.isBiting && this.canAttack() && currentTime > timeBetweenAttacks) {
+            if (!this.isAttacking && !this.isBiting && this.isTargetInAttackRange() && currentTime > timeBetweenAttacks) {
                 normalAttack();
             }
         }
@@ -485,12 +502,13 @@ public class ZombieNormal extends Node implements AIControllable {
 
     private void updateAfterAttack() {
         if (this.isAttacking && currentTime > timeBetweenAttacks) {
-            if (this.canAttack()) {
+            if (this.isTargetInAttackRange()) {
                 this.target.applyDamage(25, this);
             }
             this.isAttacking = false;
-            if (this.isBiting) {
+            if (this.getTarget() != null && this.isBiting) {
                 this.target.setIsGrabbed(false);
+                this.getTarget().setGrabber(null);
             }
             this.isBiting = false;
         }
@@ -499,9 +517,10 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public boolean canMove() {
         return this.health > 0
-                && (!this.isAttacking || this.getState().equals(EnumActorState.IN_AIR))
+                && !this.isAttacking
                 && !this.isGrabbed
-                && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE));
+                && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))
+                && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_JUMP_ATTACK_ONCE));
     }
 
     private void initRagdol() {
@@ -591,6 +610,36 @@ public class ZombieNormal extends Node implements AIControllable {
     @Override
     public boolean isDeath() {
         return this.isDead;
+    }
+
+    @Override
+    public float getDamageRecoilAmount() {
+        return DAMAGE_TO_PLAYER_RECOIL_AMOUNT;
+    }
+
+    @Override
+    public EnumActorGroup getGroup() {
+        return GROUP;
+    }
+
+    @Override
+    public void setGrabber(Actor grabber) {
+        this.grabber = grabber;
+    }
+
+    @Override
+    public Actor getGrabber() {
+        return this.grabber;
+    }
+
+    @Override
+    public NavMesh getNamMesh() {
+        return this.navMesh;
+    }
+
+    @Override
+    public void setNavMesh(NavMesh navmesh) {
+        this.navMesh = navmesh;
     }
 
 }

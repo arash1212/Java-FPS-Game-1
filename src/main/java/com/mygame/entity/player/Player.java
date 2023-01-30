@@ -5,7 +5,6 @@
 package com.mygame.entity.player;
 
 import com.jme3.asset.AssetManager;
-import com.jme3.bounding.BoundingBox;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.collision.shapes.CapsuleCollisionShape;
 import com.jme3.bullet.control.CharacterControl;
@@ -17,6 +16,7 @@ import com.jme3.scene.CameraNode;
 import com.jme3.scene.Node;
 import com.jme3.system.Timer;
 import com.mygame.entity.interfaces.Actor;
+import com.mygame.entity.interfaces.EnumActorGroup;
 import com.mygame.entity.interfaces.EnumActorState;
 import com.mygame.entity.interfaces.Weapon;
 import com.mygame.entity.weapons.pistol.PistolMakarove;
@@ -39,6 +39,8 @@ public class Player extends Node implements Actor {
     private static final float HEIGHT = 1.8f;
     private static final float MIN_CAMERA_X = -1.4F;
     private static final float MAX_CAMERA_X = 1.4F;
+
+    private static final EnumActorGroup GROUP = EnumActorGroup.GROUP2;
 
     private float currentSpeed = 6;
     private float currentFov = 50f;
@@ -71,6 +73,7 @@ public class Player extends Node implements Actor {
     //Health
     private float health = 100;
     private Actor attacker;
+    private Actor grabber;
 
     //HeadBob
     private final Timer timer;
@@ -333,7 +336,7 @@ public class Player extends Node implements Actor {
     public void applyDamage(float damage, Actor attackers) {
         //this.health -= damage;
 
-        this.targetRotation.addLocal((float) (Math.random() * (1.f - 0.6f) + 0.6f), 0, 0);
+        this.targetRotation.addLocal(attackers.getDamageRecoilAmount(), 0, 0);
     }
 
     @Override
@@ -371,6 +374,26 @@ public class Player extends Node implements Actor {
     @Override
     public boolean isDeath() {
         return false;
+    }
+
+    @Override
+    public float getDamageRecoilAmount() {
+        throw new UnsupportedOperationException("Not supported yet.");
+    }
+
+    @Override
+    public EnumActorGroup getGroup() {
+        return GROUP;
+    }
+
+    @Override
+    public void setGrabber(Actor grabber) {
+        this.grabber = grabber;
+    }
+
+    @Override
+    public Actor getGrabber() {
+        return grabber;
     }
 
 }

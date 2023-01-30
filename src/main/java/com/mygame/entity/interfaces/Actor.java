@@ -95,4 +95,20 @@ public interface Actor {
     }
 
     boolean isDeath();
+
+    float getDamageRecoilAmount();
+
+    EnumActorGroup getGroup();
+
+    default float getDistanceToTarget(Actor target) {
+        return this.getPosition().distance(target.getPosition());
+    }
+    
+    void setGrabber(Actor grabber);
+    
+    Actor getGrabber();
+    
+    default boolean isWalking(){
+        return !this.getControl().getWalkDirection().isSimilar(new Vector3f(0, 0, 0), 0.001f);
+    }
 }

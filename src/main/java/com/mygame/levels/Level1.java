@@ -5,6 +5,7 @@
 package com.mygame.levels;
 
 import com.jme3.math.Vector3f;
+import com.mygame.entity.ai.soldiers.SoldierAiNormal;
 import com.mygame.entity.ai.zombie.ZombieNormal;
 import com.mygame.entity.interfaces.AIControllable;
 import com.mygame.entity.interfaces.Actor;
@@ -36,7 +37,10 @@ public class Level1 implements Level {
 
         this.spawnPlayer();
 
-        this.spawnZombies();
+        this.spawnZombies(new Vector3f(0, 0, 5));
+        // this.spawnZombies(new Vector3f(0, 9, 5));
+        this.spawnEnemySoldier(new Vector3f(0, 20, -40));
+//        this.spawnEnemySoldier(new Vector3f(0, 10, -30));
     }
 
     @Override
@@ -45,9 +49,9 @@ public class Level1 implements Level {
             actor.update(tpf);
 
             //Testing
-            if (actors.size() <= 1) {
-                this.spawnZombies();
-            }
+//            if (actors.size() <= 2) {
+//                this.spawnZombies();
+//            }
         }
     }
 
@@ -66,11 +70,18 @@ public class Level1 implements Level {
         return Level1.PLAYER_SPAWN_POINT;
     }
 
-    private void spawnZombies() {
+    public void spawnZombies(Vector3f position) {
         ZombieNormal testZombie = new ZombieNormal();
-        testZombie.spawn(new Vector3f(0, 0, 5));
-        testZombie.setTarget(Managers.getInstance().getPlayer());
+        testZombie.spawn(position);
+        // testZombie.setTarget(Managers.getInstance().getPlayer());
         this.actors.add(testZombie);
+    }
+
+    public void spawnEnemySoldier(Vector3f position) {
+        SoldierAiNormal testEnemySoldier = new SoldierAiNormal();
+        testEnemySoldier.spawn(position);
+        // testEnemySoldier.setTarget(Managers.getInstance().getPlayer());
+        this.actors.add(testEnemySoldier);
     }
 
     @Override
