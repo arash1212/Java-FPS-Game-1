@@ -21,7 +21,9 @@ import com.mygame.entity.interfaces.EnumActorState;
 import com.mygame.entity.interfaces.Weapon;
 import com.mygame.entity.weapons.pistol.PistolMakarove;
 import com.mygame.settings.Managers;
+import com.mygame.settings.UIManager;
 import com.mygame.settings.input.InputState;
+import com.mygame.ui.Crosshair;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -93,8 +95,12 @@ public class Player extends Node implements Actor {
     //recoil 
     private Vector3f currentRotation = new Vector3f();
     private Vector3f targetRotation = new Vector3f();
-    private final float recoilSpeed = 25;
+    private final float recoilSpeed = 18;
     private final float returnSpeed = 2;
+
+    //crosshair
+    private Crosshair crosshair;
+    private float shootAccuracy = 0.0f;
 
     public Player() {
         this.inputState = InputState.getInstance();
@@ -165,6 +171,9 @@ public class Player extends Node implements Actor {
 
         this.recoil(tpf);
 
+        updateCrosshair();
+
+        this.updateShootAccuracy(tpf);
     }
 
     /**
@@ -176,6 +185,7 @@ public class Player extends Node implements Actor {
         cameraBaseX = FastMath.clamp(this.cameraBaseX + (-v), MIN_CAMERA_X, MAX_CAMERA_X);
         this.cameraBase.setLocalRotation(new Quaternion().fromAngles(cameraBaseX, 0, 0));
         if (inputState.mouseXY.y != 0) {
+//            this.addToShootAccuracy(0.1f);
             inputState.mouseXY.y = 0;
         }
     }
@@ -184,6 +194,7 @@ public class Player extends Node implements Actor {
         float h = inputState.mouseXY.getX() / 1024;
         if (inputState.mouseXY.x != 0) {
             angles[1] += -h * mouseSensitivity;
+//            this.addToShootAccuracy(0.1f);
             inputState.mouseXY.x = 0;
         }
 
@@ -288,6 +299,7 @@ public class Player extends Node implements Actor {
     private void fire() {
         if (this.inputState.isPressedFire) {
             this.selectedWeapon.fire();
+            this.addToShootAccuracy(0.5f);
             if (this.selectedWeapon.isSingleShot()) {
                 this.inputState.isPressedFire = false;
             }
@@ -317,6 +329,59 @@ public class Player extends Node implements Actor {
         this.cameraNode.setLocalRotation(new Quaternion().fromAngles(currentRotation.x, currentRotation.y, currentRotation.z));
     }
 
+    /**
+     * ********************************Crosshair*****************************************
+     */
+    private void updateCrosshair() {
+        if (crosshair == null) {
+            this.crosshair = UIManager.getInstance().getCrosshair();
+        }
+
+        if (crosshair != null) {
+            //expand/reset ctosshair
+            if (this.shouldExpanceCrosshair()) {
+
+                //Expand Amount Running /Walking
+                if (this.state == EnumActorState.RUNNING) {
+                    this.crosshair.setExpandAmount(this.crosshair.getDefaultExpandAmount() * 2);
+                } else {
+                    this.crosshair.setExpandAmount(this.crosshair.getDefaultExpandAmount());
+                }
+
+                this.crosshair.setShouldExpand(true);
+            } else {
+                this.crosshair.setShouldExpand(false);
+            }
+
+            //hide/show ctosshair
+            if (shouldHideCrosshair()) {
+                this.crosshair.hide();
+            } else {
+                this.crosshair.show();
+            }
+        }
+    }
+
+    private boolean shouldExpanceCrosshair() {
+        return this.isWalking()
+                || this.state == EnumActorState.IN_AIR
+                || this.shootAccuracy > 0;
+    }
+
+    private boolean shouldHideCrosshair() {
+        return this.selectedWeapon.isAiming();
+    }
+
+    private void addToShootAccuracy(float amount) {
+        this.shootAccuracy = FastMath.clamp(this.shootAccuracy += amount, 0, 0.1f);
+    }
+
+    private void updateShootAccuracy(float tpf) {
+        if (this.shootAccuracy > 0) {
+            this.shootAccuracy -= tpf;
+        }
+    }
+
     @Override
     public EnumActorState getState() {
         return state;
@@ -335,8 +400,13 @@ public class Player extends Node implements Actor {
     @Override
     public void applyDamage(float damage, Actor attackers) {
         //this.health -= damage;
+        int random = (int) Math.round(Math.random());
 
-        this.targetRotation.addLocal(attackers.getDamageRecoilAmount(), 0, 0);
+        if (random == 1) {
+            this.targetRotation.addLocal(attackers.getDamageRecoilAmount(), attackers.getDamageRecoilAmount() / 2, 0);
+        } else if (random == 0) {
+            this.targetRotation.addLocal(-attackers.getDamageRecoilAmount(), -attackers.getDamageRecoilAmount() / 2, 0);
+        }
     }
 
     @Override

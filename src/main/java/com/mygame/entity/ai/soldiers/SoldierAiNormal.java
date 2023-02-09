@@ -7,6 +7,8 @@ package com.mygame.entity.ai.soldiers;
 import com.jme3.ai.navmesh.NavMesh;
 import com.jme3.ai.navmesh.NavMeshPathfinder;
 import com.jme3.anim.AnimComposer;
+import com.jme3.anim.Joint;
+import com.jme3.anim.SkinningControl;
 import com.jme3.anim.tween.Tween;
 import com.jme3.anim.tween.Tweens;
 import com.jme3.anim.tween.action.Action;
@@ -17,13 +19,20 @@ import com.jme3.bullet.BulletAppState;
 import com.jme3.bullet.animation.DacConfiguration;
 import com.jme3.bullet.animation.DynamicAnimControl;
 import com.jme3.bullet.animation.RangeOfMotion;
+import com.jme3.bullet.collision.PhysicsRayTestResult;
 import com.jme3.bullet.collision.shapes.CapsuleCollisionShape;
 import com.jme3.bullet.control.CharacterControl;
+import com.jme3.collision.CollisionResults;
+import com.jme3.light.PointLight;
+import com.jme3.material.Material;
+import com.jme3.math.ColorRGBA;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
+import com.jme3.renderer.queue.RenderQueue;
 import com.jme3.scene.Geometry;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
+import com.jme3.scene.shape.Box;
 import com.jme3.system.Timer;
 import com.mygame.entity.ai.zombie.ZombieNormal;
 import com.mygame.entity.interfaces.AIControllable;
@@ -43,13 +52,13 @@ import java.util.List;
 public class SoldierAiNormal extends Node implements AIControllable {
     //Constants
 
-    private static final float HEIGHT = 2.7f;
+    private static final float HEIGHT = 2.8f;
     private static final float TIME_TO_REMOVE_DEAD_BODY = 2.f;
-    private static final float MAX_ATTACK_DISTANCE = 20.f;
+    private static final float MAX_ATTACK_DISTANCE = 60.f;
     private static final float MAX_KICK_DISTANCE = 5.f;
-    private static final float SPEED = 14;
+    private static final float SPEED = 17;
     private static final float MAX_PATROL_DISTANCE = 30.f;
-    private static final float DAMAGE_TO_PLAYER_RECOIL_AMOUNT = 0.05f;
+    private static final float DAMAGE_TO_PLAYER_RECOIL_AMOUNT = 0.00001f;
     private static final EnumActorGroup GROUP = EnumActorGroup.GROUP1;
     private static final String PATH_TO_MODEL = "Models/soldiers/soldierNormal/SoldierNormal.j3o";
 
@@ -152,7 +161,6 @@ public class SoldierAiNormal extends Node implements AIControllable {
     private float timeBetweenShots = 1.f;
     private float timeBetweenKicks = 1.f;
     private int shootCount = 0;
-    private boolean isAttacking = false;
     private boolean isGrabbed = false;
     private boolean isKicked = false;
     private boolean shouldChangePosition = false;
@@ -164,7 +172,13 @@ public class SoldierAiNormal extends Node implements AIControllable {
 
     //Testing
     private Spatial model;
-    DynamicAnimControl ragdoll;
+    private DynamicAnimControl ragdoll;
+    private Spatial navigationObject;
+
+    //MuzzleFlash
+    private SkinningControl skinningControl;
+    private Joint rightHandJoint;
+    private Spatial muzzleFlash;
 
     public SoldierAiNormal() {
         this.assetManager = Managers.getInstance().getAsseManager();
@@ -179,11 +193,18 @@ public class SoldierAiNormal extends Node implements AIControllable {
         this.animComposer = ((Node) model).getChild(0).getControl(AnimComposer.class);
         initReactToHitTweens(this.getState());
 
-        CapsuleCollisionShape capsule = new CapsuleCollisionShape(1.3f, HEIGHT, 1);
-        this.control = new CharacterControl(capsule, 1.001f);
+        //navigationObject
+//        Box box = new Box(1, 1, 1);
+//        navigationObject = new Geometry("test", box);
+//        Material mat = new Material(this.assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
+//        navigationObject.setMaterial(mat);
+//        Managers.getInstance().getRootNode().attachChild(navigationObject);
+
+        CapsuleCollisionShape capsule = new CapsuleCollisionShape(0.6f, HEIGHT, 1);
+        this.control = new CharacterControl(capsule, 0.301f);
         model.addControl(control);
         this.control.setSpatial(this);
-        model.setLocalRotation(new Quaternion().fromAngles(0, 110, 0));
+        model.setLocalRotation(new Quaternion().fromAngles(0, 109.86f, 0));
 
         this.bullAppState.getPhysicsSpace().add(control);
         this.shootables.attachChild(this);
@@ -198,6 +219,9 @@ public class SoldierAiNormal extends Node implements AIControllable {
 
         this.shootSound = new AudioNode(this.assetManager, PATH_TO_SHOOT_SOUND, DataType.Buffer);
         this.shootSound.setVolume(5);
+
+        initMuzzleFlash();
+        this.hideMuzzleFlash();
     }
 
     @Override
@@ -224,16 +248,14 @@ public class SoldierAiNormal extends Node implements AIControllable {
                 //Patrol / follow Target
                 if (!this.isFoundTarget) {
                     this.randomPatrol();
-                    this.isAttacking = false;
                     this.isDetectionSoundPlayed = false;
                     this.shouldChangePosition = false;
+                    this.shootCount = 0;
                 } else if (this.isFoundTarget) {
-                    lookAtTarget(this.getLastTargetPosition());
-
                     if (this.getDistanceToTarget(target) >= MAX_ATTACK_DISTANCE || !this.isTargetVisible(target)) {
                         this.navigateTo(this.getLastTargetPosition());
                         this.shouldChangePosition = false;
-                    } else if (!this.shouldChangePosition) {
+                    } else if (!this.shouldChangePosition()) {
                         this.control.setWalkDirection(new Vector3f(0, 0, 0));
                         this.state = EnumActorState.STAND_STILL;
                     }
@@ -241,7 +263,6 @@ public class SoldierAiNormal extends Node implements AIControllable {
                     if (!this.isDetectionSoundPlayed) {
                         //this.playDetectionSound();
                     }
-
                     this.attack(tpf);
                 }
                 this.isGrabbedSoundPlayed = false;
@@ -255,8 +276,15 @@ public class SoldierAiNormal extends Node implements AIControllable {
             //this.lookAtTargetCloseDistance();
             this.updateDetection(tpf);
 
+            this.updateLookAtPosition();
+
+            this.updateAfterAttack();
+
         }
         this.die();
+
+        //testing
+//        this.navigationObject.setLocalTranslation(patrolPoint);
     }
 
     @Override
@@ -292,25 +320,23 @@ public class SoldierAiNormal extends Node implements AIControllable {
         }
 
         if (!isGrabbed && this.canMove()) {
-            if (state == EnumActorState.WALKING && this.currentState != EnumActorState.WALKING && !this.isAttacking) {
+            if (state == EnumActorState.WALKING && this.currentState != EnumActorState.WALKING) {
                 this.animComposer.setCurrentAction(ANIM_ACTION_WALK);
                 this.currentState = EnumActorState.WALKING;
+
             } else if (state == EnumActorState.RUNNING) {
-                if (!this.isAttacking && this.distanceToTarget(target) >= MAX_ATTACK_DISTANCE
-                        && this.currentState != EnumActorState.RUNNING) {
+                if (this.distanceToTarget(target) >= MAX_ATTACK_DISTANCE && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_RUN))) {
                     this.animComposer.setCurrentAction(ANIM_ACTION_RUN);
-                    this.currentState = EnumActorState.RUNNING;
-                } else if (!this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_WALK_AIM))) {
+                } else if (this.distanceToTarget(target) <= MAX_ATTACK_DISTANCE && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_WALK_AIM))) {
                     this.animComposer.setCurrentAction(ANIM_ACTION_WALK_AIM);
                 }
                 this.currentState = EnumActorState.RUNNING;
 
-            } else if ((state == EnumActorState.STAND_STILL || state == EnumActorState.IN_AIR) && this.currentState != EnumActorState.STAND_STILL && !this.isAttacking) {
+            } else if ((state == EnumActorState.STAND_STILL || state == EnumActorState.IN_AIR) && this.currentState != EnumActorState.STAND_STILL) {
                 this.animComposer.setCurrentAction(ANIM_ACTION_IDLE);
                 this.currentState = EnumActorState.STAND_STILL;
             }
         }
-//        }
     }
 
     @Override
@@ -338,11 +364,17 @@ public class SoldierAiNormal extends Node implements AIControllable {
         if (!isGrabbed) {
             this.lookAtTarget(attacker.getPosition());
         }
+        this.getLastTargetPosition().set(attacker.getPosition());
 
+        this.shootCount = 0;
         this.detectionAmount = 1;
 
         this.attacker = attacker;
+
+        // if (this.animComposer != null && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
         this.animComposer.setCurrentAction(ANIM_ACTION_REACT_TO_HIT_ONCE);
+        // }
+
     }
 
     /**
@@ -490,47 +522,49 @@ public class SoldierAiNormal extends Node implements AIControllable {
                 && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE));
     }
 
+    private boolean shouldChangePosition() {
+        return this.shouldChangePosition || this.target.getPosition().distance(this.getPosition()) < 8;
+    }
+
     /**
      * ********************************AttackTypes*****************************************
      */
-    private void selectAndPlayShootAnimation() {
-        if (isGrabbed == false && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
-            // System.out.println("state :" + this.getState().name());
+    private void applyDamageToTarget() {
+        Vector3f pos = this.getTarget().getPosition();
+        pos.x += Math.random() * 2.f;
+        pos.y += Math.random() * 2.f;
+        pos.z += Math.random() * 2.f;
 
-            if (this.control.getWalkDirection().equals(new Vector3f(0, 0, 0))) {
-                this.animComposer.setCurrentAction(ANIM_ACTION_FIRE_ONCE);
-                this.currentState = EnumActorState.STAND_STILL;
-                // System.out.println("here main");
-            } else if (this.isWalking() && this.state == EnumActorState.RUNNING
-                    && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_WALK_FIRE))
-                    && this.distanceToTarget(target) < MAX_ATTACK_DISTANCE - 5) {
-                this.animComposer.setCurrentAction(ANIM_ACTION_WALK_FIRE);
-                this.currentState = EnumActorState.RUNNING;
-            }
+        List<PhysicsRayTestResult> results = this.physicsRayTo(this.getPosition(), pos);
+        if (!results.isEmpty() && results.get(0).getCollisionObject().getUserObject() == this.getTarget()) {
+            this.target.applyDamage(5, this);
         }
     }
 
     private void shoot() {
         if (this.shootCount < 8) {
-//            this.state = EnumActorState.SHOOTING;
-            this.isAttacking = true;
-            this.selectAndPlayShootAnimation();
+            this.showMuzzleFlash();
+            this.state = EnumActorState.SHOOTING;
+            if (!this.isWalking()) {
+                this.animComposer.setCurrentAction(ANIM_ACTION_FIRE_ONCE);
+            }
             this.timeBetweenShots = this.currentTime + 0.08f;
             this.shootSound.playInstance();
             this.shootCount++;
-            this.shouldChangePosition = false;
-            if (this.isTargetVisible(this.getTarget())) {
-                this.target.applyDamage(5, this);
-            }
+            //  this.shouldChangePosition = false;
+            applyDamageToTarget();
+
         } else {
             this.shootCount = 0;
             timeBetweenShots = this.currentTime + 2.1f;
             this.shouldChangePosition = true;
-            this.selectAndPlayShootAnimation();
 
-            //??
-            positionToMoveToAfterAttack.set(this.findRandomPoint());
-//            this.state = EnumActorState.WALKING;
+            if (this.distanceToTarget(target) < 10) {
+                positionToMoveToAfterAttack.set(this.findRandomPoint(target.getPosition()));
+            } else {
+                positionToMoveToAfterAttack.set(this.findRandomPoint(this.getPosition()));
+            }
+            this.hideMuzzleFlash();
         }
     }
 
@@ -539,36 +573,35 @@ public class SoldierAiNormal extends Node implements AIControllable {
             this.animComposer.setCurrentAction(ANIM_ACTION_KICK_ONCE);
             this.timeBetweenKicks = this.currentTime + 0.3f;
             this.isKicked = true;
-            this.state = EnumActorState.STAND_STILL;
-            this.isAttacking = true;
         }
 
         if (this.isKicked && this.currentTime >= this.timeBetweenKicks) {
             //push
-            System.out.println("push");
             this.timeBetweenKicks = this.currentTime + 1.f;
             Vector3f pushDirection = this.getPosition().subtract(target.getPosition());
             if (this.getTarget().getControl().onGround()) {
                 this.getTarget().getControl().setWalkDirection(pushDirection.normalize().negate().multLocal(3));
             }
-            
+
+            this.target.applyDamage(25, this);
             this.isKicked = false;
-            this.isAttacking = false;
             this.shouldChangePosition = true;
-//            this.state = EnumActorState.STAND_STILL;
+            positionToMoveToAfterAttack.set(this.findRandomPoint(target.getPosition()));
         }
     }
 
     /**
      * ********************************Attack*****************************************
      */
-    private Vector3f findRandomPoint() {
+    private Vector3f findRandomPoint(Vector3f around) {
         int count = 0;
-        Vector3f point = this.getRandomPointOnNavMesh(this.getTarget().getPosition(), MAX_ATTACK_DISTANCE - 5);
-        while (point.isSimilar(positionToMoveToAfterAttack, 0.001f) && count < 5) {
+        Vector3f point = this.getRandomPointOnNavMesh(around, 10);
+        while (point.isSimilar(positionToMoveToAfterAttack, 0.001f) && count < 30
+                || !this.isTargetCanBeSeenFrom(point, target) && count < 10
+                || this.target.getPosition().distance(point) > MAX_ATTACK_DISTANCE && count < 10
+                || this.target.getPosition().distance(point) < 4 && count < 10) {
             point = this.getRandomPointOnNavMesh(this.getTarget().getPosition(), MAX_ATTACK_DISTANCE - 5);
             count++;
-            System.out.println("new Point");
         }
         return point;
     }
@@ -586,26 +619,20 @@ public class SoldierAiNormal extends Node implements AIControllable {
             } else if (this.canKick()) {
                 this.kick(tpf);
             } else {
-                this.isAttacking = false;
                 this.state = EnumActorState.WALKING;
             }
 
-            this.updateAfterAttack();
-
-            if (this.shouldChangePosition && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
+            if (this.shouldChangePosition() && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
                 this.navigateTo(positionToMoveToAfterAttack);
-            } else if (this.shouldChangePosition && this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
+            } else if (this.shouldChangePosition() && this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE))) {
                 this.control.setWalkDirection(new Vector3f(0, 0, 0));
             }
         }
     }
 
     private void updateAfterAttack() {
-        if (this.isAttacking && currentTime > timeBetweenShots) {
-            if (this.isTargetInAttackRange()) {
-                this.target.applyDamage(25, this);
-            }
-            //this.isAttacking = false;
+        if (currentTime > timeBetweenShots) {
+            this.hideMuzzleFlash();
         }
     }
 
@@ -728,7 +755,6 @@ public class SoldierAiNormal extends Node implements AIControllable {
         return this.health > 0
                 && (!this.state.equals(EnumActorState.ATTACKING)
                 && !this.state.equals(EnumActorState.SHOOTING)
-                && !this.isAttacking
                 && !this.isGrabbed
                 && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_REACT_TO_HIT_ONCE)))
                 && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_KICK_ONCE))
@@ -737,6 +763,9 @@ public class SoldierAiNormal extends Node implements AIControllable {
                 && !this.animComposer.getCurrentAction().equals(this.animComposer.action(ANIM_ACTION_KICK_ONCE));
     }
 
+    /**
+     * ********************************Ragdoll*****************************************
+     */
     private void initRagdol() {
         //Ragdoll (Test)
         ragdoll = new DynamicAnimControl();
@@ -759,6 +788,36 @@ public class SoldierAiNormal extends Node implements AIControllable {
         ragdoll.setEnabled(true);
         ((Node) this.model).getChild(0).addControl(ragdoll);
         ragdoll.physicsTick(this.bullAppState.getPhysicsSpace(), 1);
+    }
+
+    /**
+     * ********************************MuzzleFlash*****************************************
+     */
+    private void initMuzzleFlash() {
+        PointLight muzzleLight = new PointLight();
+        muzzleLight.setColor(ColorRGBA.Yellow);
+        muzzleLight.setRadius(10f);
+
+        this.skinningControl = ((Node) model).getChild(0).getControl(SkinningControl.class);
+        this.rightHandJoint = skinningControl.getArmature().getJoint("mixamorig:RightHand");
+        this.muzzleFlash = this.assetManager.loadModel("Models/weapons/muzzleFlash1/MuzzleFlash.j3o");
+        this.muzzleFlash.setLocalScale(34.9f, 34.9f, 34.9f);
+        this.muzzleFlash.setLocalTranslation(13, 209.f, -5);
+        this.muzzleFlash.setLocalRotation(new Quaternion().fromAngles(0, 90, 7.8f));
+        this.muzzleFlash.setShadowMode(RenderQueue.ShadowMode.Off);
+        skinningControl.getAttachmentsNode(this.rightHandJoint.getName()).attachChild(muzzleFlash);
+
+        muzzleLight.setPosition(new Vector3f(muzzleFlash.getLocalTranslation()));
+        skinningControl.getAttachmentsNode(this.rightHandJoint.getName()).addLight(muzzleLight);
+
+    }
+
+    private void hideMuzzleFlash() {
+        this.skinningControl.getAttachmentsNode(rightHandJoint.getName()).detachChild(muzzleFlash);
+    }
+
+    private void showMuzzleFlash() {
+        this.skinningControl.getAttachmentsNode(rightHandJoint.getName()).attachChild(muzzleFlash);
     }
 
     @Override

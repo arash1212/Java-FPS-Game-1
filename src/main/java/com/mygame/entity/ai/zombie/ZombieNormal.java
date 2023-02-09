@@ -39,7 +39,7 @@ import java.util.List;
 public class ZombieNormal extends Node implements AIControllable {
 
     //Constants
-    private static final float HEIGHT = 2.7f;
+    private static final float HEIGHT = 2.3f;
     private static final float TIME_TO_REMOVE_DEAD_BODY = 2.f;
     private static final float SPEED = 14;
     private static final float MAX_PATROL_DISTANCE = 25.f;
@@ -137,8 +137,8 @@ public class ZombieNormal extends Node implements AIControllable {
         this.animComposer = ((Node) model).getChild(0).getControl(AnimComposer.class);
         initReactToHitTweens(this.getState());
 
-        CapsuleCollisionShape capsule = new CapsuleCollisionShape(1.3f, HEIGHT, 1);
-        this.control = new CharacterControl(capsule, 1.001f);
+        CapsuleCollisionShape capsule = new CapsuleCollisionShape(0.6f, HEIGHT, 1);
+        this.control = new CharacterControl(capsule, 0.301f);
         model.addControl(control);
         this.control.setSpatial(this);
         model.setLocalRotation(new Quaternion().fromAngles(0, 110, 0));
@@ -179,7 +179,6 @@ public class ZombieNormal extends Node implements AIControllable {
                 if (!this.isFoundTarget) {
                     this.randomPatrol();
                 } else if (this.isFoundTarget) {
-                    lookAtTarget(this.getLastTargetPosition());
                     this.navigateTo(this.getLastTargetPosition());
                 }
                 this.attack(tpf);
@@ -189,6 +188,7 @@ public class ZombieNormal extends Node implements AIControllable {
 
             this.updateDetection(tpf);
 
+            this.updateLookAtPosition();
             //  this.lookAtTargetCloseDistance();
         }
         this.die();
@@ -259,6 +259,8 @@ public class ZombieNormal extends Node implements AIControllable {
         this.detectionAmount = 1;
 
         this.lookAtTarget(attacker.getPosition());
+        this.getLastTargetPosition().set(attacker.getPosition());
+
         if (!this.isBiting) {
             this.animComposer.setCurrentAction(ANIM_ACTION_REACT_TO_HIT_ONCE);
         }

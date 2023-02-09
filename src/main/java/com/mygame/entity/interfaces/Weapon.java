@@ -13,6 +13,7 @@ import com.jme3.renderer.Camera;
 import com.jme3.scene.Node;
 import com.jme3.scene.Spatial;
 import com.mygame.settings.Managers;
+import com.mygame.settings.UIManager;
 import com.mygame.settings.input.InputState;
 
 /**
@@ -71,9 +72,11 @@ public interface Weapon {
     Actor getOwner();
 
     default void applyDamageToTarget(CollisionResults results) {
-        for (CollisionResult result : results) {
-            Spatial hitObject = result.getGeometry();
-            Spatial actorObject = result.getGeometry();
+//        for (CollisionResult result : results) {
+        if (results.getClosestCollision() != null) {
+            Spatial result = results.getClosestCollision().getGeometry();
+            Spatial hitObject = result;
+            Spatial actorObject = result;
             System.out.println("pistol hit :" + hitObject.getName());
             while (!(actorObject instanceof Actor)) {
                 if (actorObject.getParent() != null) {
@@ -84,9 +87,11 @@ public interface Weapon {
             }
             if (actorObject instanceof Actor) {
                 ((Actor) actorObject).applyDamage(this.calculateDamage(hitObject), this.getOwner());
-                break;
+                UIManager.getInstance().getCrosshair().showHitMarker();
+//            break;
             }
         }
+//        }
     }
 
     default void updatePosition(float tpf, Spatial model, Vector3f defaultPos, Quaternion defaultRot, Vector3f aimPos, Quaternion aimRot) {

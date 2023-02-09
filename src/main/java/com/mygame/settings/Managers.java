@@ -10,6 +10,7 @@ import com.jme3.audio.AudioRenderer;
 import com.jme3.bullet.BulletAppState;
 import com.jme3.input.InputManager;
 import com.jme3.renderer.Camera;
+import com.jme3.renderer.ViewPort;
 import com.jme3.scene.CameraNode;
 import com.jme3.scene.Node;
 import com.jme3.scene.control.CameraControl;
@@ -31,6 +32,7 @@ public class Managers {
     private AppStateManager stateManager;
     private AppSettings appSettings;
     private AudioRenderer audioRenderer;
+    private ViewPort guiViewPort;
     private Node rootNode;
     private Node shooteables;
     private Camera cam;
@@ -40,6 +42,9 @@ public class Managers {
     private Actor player;
     private Timer timer;
     private List<Actor> actors;
+    private ViewPort viewPort;
+    private Node guiNode;
+    private UIManager uiManager;
 
     private final static Managers instance = new Managers();
 
@@ -166,4 +171,35 @@ public class Managers {
         this.actors = actors;
     }
 
+    public ViewPort getGuiViewPort() {
+        return guiViewPort;
+    }
+
+    public void setGuiViewPort(ViewPort guiViewPort) {
+        this.guiViewPort = guiViewPort;
+    }
+
+    public ViewPort getViewPort() {
+        return viewPort;
+    }
+
+    public void setViewPort(ViewPort viewPort) {
+        this.viewPort = viewPort;
+    }
+
+    public Node getGuiNode() {
+        return guiNode;
+    }
+
+    public void setGuiNode(Node guiNode) {
+        this.guiNode = guiNode;
+    }
+
+    public UIManager getUiManager() {
+        return uiManager;
+    }
+
+    public void setUiManager(UIManager uiManager) {
+        this.uiManager = uiManager;
+    }
 }

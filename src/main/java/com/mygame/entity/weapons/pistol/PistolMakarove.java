@@ -13,6 +13,7 @@ import com.jme3.audio.AudioData.DataType;
 import com.jme3.audio.AudioNode;
 import com.jme3.collision.CollisionResult;
 import com.jme3.collision.CollisionResults;
+import com.jme3.math.FastMath;
 import com.jme3.math.Quaternion;
 import com.jme3.math.Vector3f;
 import com.jme3.renderer.Camera;
@@ -40,9 +41,9 @@ public class PistolMakarove implements Weapon {
     private static final float DAMAGE = 10.f;
     private static final Vector3f DEFAULT_POSITION = new Vector3f(0, -0.95f, 0.61f);
     private static final Quaternion DEFAULT_ROTATION = new Quaternion().fromAngles(0.0f, 39.11f, -0.05f);
-    private static final Vector3f AIM_POSITION = new Vector3f(0.2f, -0.807f, 0.67f);
+    private static final Vector3f AIM_POSITION = new Vector3f(0.1973f, -0.8102f, 0.67f);
     //private static final Quaternion AIM_ROTATION = new Quaternion().fromAngles(0.0f, 39.096f, -0.00f);
-    private static final Quaternion AIM_ROTATION = new Quaternion().fromAngles(0.0f, 39.248f, -0.01f);
+    private static final Quaternion AIM_ROTATION = new Quaternion().fromAngles(0.0f, 39.2388f, -0.01f);
 
     private boolean isAiming = false;
 
@@ -138,7 +139,15 @@ public class PistolMakarove implements Weapon {
         this.animComposer.setCurrentAction(ANIM_ACTION_FIRE_ONCE);
         this.fireSound.playInstance();
 
-        CollisionResults results = this.rayTo(this.cam.getLocation(), this.cam.getDirection(), shootables);
+        Vector3f camDir = this.cam.getDirection();
+
+        if (!isAiming) {
+            camDir.x += Math.random() * 0.05f;
+            camDir.y += Math.random() * 0.05f;
+            camDir.z += Math.random() * 0.05f;
+        }
+
+        CollisionResults results = this.rayTo(this.cam.getLocation(), camDir, shootables);
         this.applyDamageToTarget(results);
 
         if (Managers.getInstance().getPlayer() != null) {
@@ -161,7 +170,7 @@ public class PistolMakarove implements Weapon {
         }
 
         fireOnce = this.animComposer.actionSequence(ANIM_ACTION_FIRE_ONCE, fireAction, doneTween);
-        fireOnce.setSpeed(1.0f);
+        fireOnce.setSpeed(1.1f);
     }
 
     @Override

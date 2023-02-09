@@ -2,13 +2,29 @@ package com.mygame;
 
 import com.jme3.app.SimpleApplication;
 import com.jme3.bullet.BulletAppState;
+import com.jme3.light.DirectionalLight;
+import com.jme3.math.ColorRGBA;
+import com.jme3.math.Vector3f;
+import com.jme3.post.FilterPostProcessor;
+import com.jme3.post.ssao.SSAOFilter;
 import com.jme3.renderer.RenderManager;
 import com.jme3.scene.CameraNode;
 import com.jme3.scene.Node;
+import com.jme3.shadow.DirectionalLightShadowRenderer;
+import com.jme3.util.SkyFactory;
 import com.mygame.levels.Level;
 import com.mygame.levels.Level1;
 import com.mygame.settings.Managers;
+import com.mygame.settings.UIManager;
 import com.mygame.settings.input.InputSettings;
+import com.mygame.ui.Crosshair;
+import com.mygame.ui.TestUi;
+import com.simsilica.lemur.Button;
+import com.simsilica.lemur.Command;
+import com.simsilica.lemur.Container;
+import com.simsilica.lemur.GuiGlobals;
+import com.simsilica.lemur.Label;
+import com.simsilica.lemur.style.BaseStyles;
 
 public class Main extends SimpleApplication {
 
@@ -18,6 +34,7 @@ public class Main extends SimpleApplication {
 
     private Level level;
 
+//    private UIManager uiManager = UIManager.getInstance();
     public static void main(String[] args) {
         Main app = new Main();
         app.start();
@@ -30,7 +47,7 @@ public class Main extends SimpleApplication {
         cam.setFrustumNear(0.001f);
 
         this.stateManager.attach(bulletAppState);
-//        bulletAppState.setDebugEnabled(true);
+       // bulletAppState.setDebugEnabled(true);
 
         initManagers();
 
@@ -39,6 +56,17 @@ public class Main extends SimpleApplication {
         initInputSettings();
 
         loadLevel();
+
+        //test ui
+        //inits
+        GuiGlobals.initialize(this);
+
+        //TestUI
+//        guiNode.attachChild(new TestUi());
+        UIManager.getInstance().showInGameUI();
+
+        //getRootNode().attachChild(SkyFactory.createSky(getAssetManager(), "Textures/skybox/SkyBox3.png", SkyFactory.EnvMapType.CubeMap));
+
     }
 
     @Override
@@ -47,6 +75,8 @@ public class Main extends SimpleApplication {
         if (level != null) {
             level.update(tpf);
         }
+
+        UIManager.getInstance().update(tpf);
     }
 
     @Override
@@ -73,6 +103,10 @@ public class Main extends SimpleApplication {
         Managers.getInstance().setAppSettings(this.settings);
         Managers.getInstance().setCameraNode(new CameraNode("cameraNode", this.cam));
         Managers.getInstance().setTimer(this.getTimer());
+        Managers.getInstance().setGuiViewPort(this.guiViewPort);
+        Managers.getInstance().setViewPort(this.viewPort);
+        Managers.getInstance().setGuiNode(guiNode);
+//        Managers.getInstance().setUiManager(UIManager.getInstance());
     }
 
     private void initNodes() {

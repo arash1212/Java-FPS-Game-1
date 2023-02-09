@@ -44,7 +44,7 @@ public interface Actor {
     default void lookAtTarget(Vector3f position) {
         Vector3f dir = this.getPosition().subtract(position);
         dir.y = 0;
-        this.getControl().setViewDirection(dir);
+        this.getControl().getViewDirection().interpolateLocal(dir, Managers.getInstance().getTimer().getTimePerFrame() * 15);
     }
 
     default void updateActorState() {
@@ -82,7 +82,7 @@ public interface Actor {
         return results;
     }
 
-    default List<PhysicsRayTestResult> physicsTayTo(Vector3f from, Vector3f to) {
+    default List<PhysicsRayTestResult> physicsRayTo(Vector3f from, Vector3f to) {
         return Managers.getInstance().getBulletAppState().getPhysicsSpace().rayTest(from, to);
     }
 
@@ -103,12 +103,12 @@ public interface Actor {
     default float getDistanceToTarget(Actor target) {
         return this.getPosition().distance(target.getPosition());
     }
-    
+
     void setGrabber(Actor grabber);
-    
+
     Actor getGrabber();
-    
-    default boolean isWalking(){
+
+    default boolean isWalking() {
         return !this.getControl().getWalkDirection().isSimilar(new Vector3f(0, 0, 0), 0.001f);
     }
 }
