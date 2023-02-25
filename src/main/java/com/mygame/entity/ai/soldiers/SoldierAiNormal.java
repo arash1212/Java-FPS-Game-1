@@ -275,7 +275,9 @@ public class SoldierAiNormal extends Node implements AIControllable {
             //this.lookAtTargetCloseDistance();
             this.updateDetection(tpf);
 
-            this.updateLookAtPosition();
+            if (!this.isGrabbed) {
+                this.updateLookAtPosition();
+            }
 
             this.updateAfterAttack();
 
@@ -362,7 +364,7 @@ public class SoldierAiNormal extends Node implements AIControllable {
 //        this.setTarget(attacker);
         this.checkIfShouldSetTargetToAttacker(attacker);
         if (!isGrabbed) {
-         //   this.lookAtTarget(attacker.getPosition());
+            //   this.lookAtTarget(attacker.getPosition());
         }
         this.getLastTargetPosition().set(attacker.getPosition());
 
