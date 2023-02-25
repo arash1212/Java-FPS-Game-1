@@ -64,7 +64,7 @@ public class Level1 implements Level {
 
         this.spawnPlayer();
 
-        //this.spawnZombies(new Vector3f(0, 0, 5));
+        this.spawnZombies(new Vector3f(0, 0, 5));
         // this.spawnZombies(new Vector3f(0, 9, 5));
         //  this.spawnEnemySoldier(new Vector3f(0, 1, -40));
         this.spawnEnemySoldier(new Vector3f(0, 1, -35));

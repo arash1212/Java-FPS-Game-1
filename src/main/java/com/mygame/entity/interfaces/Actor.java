@@ -44,7 +44,7 @@ public interface Actor {
     default void lookAtTarget(Vector3f position) {
         Vector3f dir = this.getPosition().subtract(position);
         dir.y = 0;
-        this.getControl().getViewDirection().interpolateLocal(dir, Managers.getInstance().getTimer().getTimePerFrame() * 15);
+        this.getControl().getViewDirection().interpolateLocal(dir, Managers.getInstance().getTimer().getTimePerFrame() * 8);
     }
 
     default void updateActorState() {
@@ -101,7 +101,11 @@ public interface Actor {
     EnumActorGroup getGroup();
 
     default float getDistanceToTarget(Actor target) {
-        return this.getPosition().distance(target.getPosition());
+        if (target != null) {
+            return this.getPosition().distance(target.getPosition());
+        } else {
+            return Float.MAX_VALUE;
+        }
     }
 
     void setGrabber(Actor grabber);

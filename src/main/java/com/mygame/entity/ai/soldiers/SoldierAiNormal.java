@@ -199,7 +199,6 @@ public class SoldierAiNormal extends Node implements AIControllable {
 //        Material mat = new Material(this.assetManager, "Common/MatDefs/Misc/Unshaded.j3md");
 //        navigationObject.setMaterial(mat);
 //        Managers.getInstance().getRootNode().attachChild(navigationObject);
-
         CapsuleCollisionShape capsule = new CapsuleCollisionShape(0.6f, HEIGHT, 1);
         this.control = new CharacterControl(capsule, 0.301f);
         model.addControl(control);
@@ -361,8 +360,9 @@ public class SoldierAiNormal extends Node implements AIControllable {
         initReactToHitTweens(this.getState());
 
 //        this.setTarget(attacker);
+        this.checkIfShouldSetTargetToAttacker(attacker);
         if (!isGrabbed) {
-            this.lookAtTarget(attacker.getPosition());
+         //   this.lookAtTarget(attacker.getPosition());
         }
         this.getLastTargetPosition().set(attacker.getPosition());
 
@@ -523,7 +523,7 @@ public class SoldierAiNormal extends Node implements AIControllable {
     }
 
     private boolean shouldChangePosition() {
-        return this.shouldChangePosition || this.target.getPosition().distance(this.getPosition()) < 8;
+        return this.shouldChangePosition || this.getTarget() != null && this.target.getPosition().distance(this.getPosition()) < 8;
     }
 
     /**

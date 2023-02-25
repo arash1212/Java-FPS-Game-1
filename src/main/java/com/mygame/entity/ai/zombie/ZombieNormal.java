@@ -188,7 +188,9 @@ public class ZombieNormal extends Node implements AIControllable {
 
             this.updateDetection(tpf);
 
-            this.updateLookAtPosition();
+            if (!this.isBiting && this.control.onGround()) {
+                this.updateLookAtPosition();
+            }
             //  this.lookAtTargetCloseDistance();
         }
         this.die();
@@ -256,9 +258,10 @@ public class ZombieNormal extends Node implements AIControllable {
         initReactToHitTweens(this.getState());
 
 //        this.setTarget(attacker);
+        this.checkIfShouldSetTargetToAttacker(attacker);
         this.detectionAmount = 1;
 
-        this.lookAtTarget(attacker.getPosition());
+       // this.lookAtTarget(attacker.getPosition());
         this.getLastTargetPosition().set(attacker.getPosition());
 
         if (!this.isBiting) {
